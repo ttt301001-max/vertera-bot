@@ -36,6 +36,7 @@ TEXTS = {
         "business": "💼 Бизнес с Vertera",
         "catalog": "📖 Каталог",
         "contact": "📞 Связаться",
+        "home": "🏠 Главная",
         "catalog_text": "📖 Наш каталог продукции Vertera:\n{catalog_link}\n\nЕсть вопросы по продуктам? Спрашивай!",
         "contact_text": "📞 Свяжитесь с нашим менеджером:\n\nTelegram: {sponsor}\nТелефон: {phone}\n\nОтвечаем быстро! 🌿",
         "error_text": "Извините, произошла ошибка. Свяжитесь напрямую:\nTelegram: {sponsor}\nТелефон: {phone}",
@@ -50,6 +51,10 @@ TEXTS = {
         "interest_business": "💼 Интересует бизнес",
         "interest_both": "🌿 И то и другое",
         "anketa_done": "✅ Заявка принята!\n\nМенеджер свяжется с вами в ближайшее время 🌿\n\nИли сами: Telegram {sponsor} / {phone}",
+        "deeplink_discount": "💸 Чтобы получить скидку 30%, сначала нужно зарегистрировать личный кабинет. Ниже — инструкция по регистрации. После этого я помогу с дальнейшими шагами.",
+        "deeplink_products": "📦 Отлично! Ниже каталог продукции Vertera. Если хотите, я помогу подобрать продукт именно под ваш запрос.",
+        "deeplink_partner": "🤝 Отлично! Vertera — это возможность начать с продукта для себя и постепенно выйти на дополнительный доход. Я могу рассказать вам первые шаги в бизнесе.",
+        "deeplink_contact": "📞 Ниже контакты для быстрой связи. Также можете написать свой вопрос прямо здесь — я помогу.",
     },
     "tk": {
         "welcome": "Hoş geldiňiz! 🌿\nMen Wera — *VERTERA* kompaniýasynyň maslahatçysy.\n\nDeňiz ösümliklerinden ýasalan tebigy önümler arkaly saglyk we goşmaça girdeji almaga kömek edýärin.\n\nSize nädip kömek edip bilerin?",
@@ -57,6 +62,7 @@ TEXTS = {
         "business": "💼 Vertera bilen iş",
         "catalog": "📖 Katalog",
         "contact": "📞 Habarlaşmak",
+        "home": "🏠 Baş sahypa",
         "catalog_text": "📖 Vertera önümlerimiziň katalogy:\n{catalog_link}\n\nÖnümler barada soraglaryňyz barmy? Soraň!",
         "contact_text": "📞 Menejerimiz bilen habarlaşyň:\n\nTelegram: {sponsor}\nTelefon: {phone}\n\nTiz jogap berýäris! 🌿",
         "error_text": "Ötünç soraýaryn, ýalňyşlyk ýüze çykdy. Göni habarlaşyň:\nTelegram: {sponsor}\nTelefon: {phone}",
@@ -71,6 +77,10 @@ TEXTS = {
         "interest_business": "💼 Iş gyzyklandyrýar",
         "interest_both": "🌿 Ikisi hem",
         "anketa_done": "✅ Arza kabul edildi!\n\nMenjerimiz ýakyn wagtda siz bilen habarlaşar 🌿\n\nÝa-da özüňiz: Telegram {sponsor} / {phone}",
+        "deeplink_discount": "💸 30% arzanladyş almak üçin ilki şahsy kabinet açmaly. Aşakda hasaba alyş görkezmesi bar. Soňra indiki ädimlerde kömek ederin.",
+        "deeplink_products": "📦 Gowy! Aşakda Vertera önümleriniň katalogy bar. Isleseňiz, size laýyk önümi saýlap bermäge kömek ederin.",
+        "deeplink_partner": "🤝 Gowy! Vertera özüňiz üçin önümden başlap, soň goşmaça girdejä çykmaga mümkinçilik berýär. Ilkinji ädimleri düşündirip bilerin.",
+        "deeplink_contact": "📞 Aşakda tiz habarlaşmak üçin maglumatlar bar. Şeýle hem soragyňyzy şu ýerde ýazyp bilersiňiz — kömek ederin.",
     },
     "uz": {
         "welcome": "Xush kelibsiz! 🌿\nMen Vera — *VERTERA* kompaniyasining maslahatchisi.\n\nDengiz o'tlaridan tayyorlangan tabiiy mahsulotlar orqali sog'liq va qo'shimcha daromad olishga yordam beraman.\n\nQanday yordam bera olaman?",
@@ -78,6 +88,7 @@ TEXTS = {
         "business": "💼 Vertera bilan biznes",
         "catalog": "📖 Katalog",
         "contact": "📞 Bog'lanish",
+        "home": "🏠 Asosiy sahifa",
         "catalog_text": "📖 Vertera mahsulotlari katalogi:\n{catalog_link}\n\nMahsulotlar haqida savollaringiz bormi? So'rang!",
         "contact_text": "📞 Menejerimiz bilan bog'laning:\n\nTelegram: {sponsor}\nTelefon: {phone}\n\nTez javob beramiz! 🌿",
         "error_text": "Kechirasiz, xatolik yuz berdi. To'g'ridan-to'g'ri bog'laning:\nTelegram: {sponsor}\nTelefon: {phone}",
@@ -92,6 +103,10 @@ TEXTS = {
         "interest_business": "💼 Biznes qiziqtiradi",
         "interest_both": "🌿 Ikkalasi ham",
         "anketa_done": "✅ Ariza qabul qilindi!\n\nMenejerimiz yaqin orada siz bilan bog'lanadi 🌿\n\nYoki o'zingiz: Telegram {sponsor} / {phone}",
+        "deeplink_discount": "💸 30% chegirma olish uchun avval shaxsiy kabinet ochish kerak. Quyida ro‘yxatdan o‘tish yo‘riqnomasi bor. Keyin keyingi qadamlarni tushuntiraman.",
+        "deeplink_products": "📦 Ajoyib! Quyida Vertera mahsulotlari katalogi bor. Xohlasangiz, sizga mos mahsulotni tanlashga yordam beraman.",
+        "deeplink_partner": "🤝 Ajoyib! Vertera o‘zingiz uchun mahsulotdan boshlash va keyin qo‘shimcha daromadga chiqish imkonini beradi. Birinchi qadamlarni tushuntirib beraman.",
+        "deeplink_contact": "📞 Quyida tez bog‘lanish uchun kontaktlar bor. Savolingizni shu yerga ham yozishingiz mumkin — yordam beraman.",
     }
 }
 
@@ -242,16 +257,143 @@ def get_main_keyboard(lang: str):
     t = TEXTS[lang]
     return ReplyKeyboardMarkup(
         [[t["buy"], t["business"]],
-         [t["catalog"], t["contact"]]],
+         [t["catalog"], t["contact"]],
+         [t["home"]]],
         resize_keyboard=True
     )
 
 def get_phone(country: str) -> str:
     return SPONSOR_PHONE_TKM if country == "TKM" else SPONSOR_PHONE_UZB
 
+
+async def handle_start_param(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    lang = context.user_data.get("lang", "ru")
+    country = context.user_data.get("country", "TKM")
+    phone = get_phone(country)
+    t = TEXTS[lang]
+    start_param = context.user_data.get("start_param", "")
+
+    if not start_param:
+        await update.message.reply_text(
+            t["welcome"],
+            parse_mode="Markdown",
+            reply_markup=get_main_keyboard(lang)
+        )
+        return CHAT
+
+    if start_param == "discount_flow":
+        reg_text = REG_INSTRUCTIONS.get(country, {}).get(lang) or REG_INSTRUCTIONS.get(country, {}).get("ru", "")
+        await update.message.reply_text(
+            t["deeplink_discount"],
+            reply_markup=get_main_keyboard(lang)
+        )
+        if reg_text:
+            await update.message.reply_text(
+                reg_text.format(link=REGISTER_LINK, sponsor=SPONSOR_USERNAME),
+                parse_mode="Markdown",
+                reply_markup=get_main_keyboard(lang)
+            )
+        return CHAT
+
+    if start_param == "products":
+        await update.message.reply_text(
+            t["deeplink_products"],
+            reply_markup=get_main_keyboard(lang)
+        )
+        await update.message.reply_text(
+            t["catalog_text"].format(catalog_link=CATALOG_LINK),
+            reply_markup=get_main_keyboard(lang)
+        )
+        return CHAT
+
+    if start_param == "partner_flow":
+        partner_prompt = {
+            "ru": "Расскажи подробно про бизнес-возможности Vertera — как зарабатывать, первые шаги.",
+            "tk": "Vertera bilen iş mümkinçilikleri barada jikme-jik gürrüň ber — nädip gazanmaly we ilkinji ädimler haýsylar.",
+            "uz": "Vertera biznes imkoniyatlari haqida batafsil tushuntir — qanday daromad qilish va birinchi qadamlar nimalardan iborat."
+        }.get(lang, "Расскажи подробно про бизнес-возможности Vertera — как зарабатывать, первые шаги.")
+        await update.message.reply_text(
+            t["deeplink_partner"],
+            reply_markup=get_main_keyboard(lang)
+        )
+        user = update.effective_user
+        if user.id not in user_histories:
+            user_histories[user.id] = []
+        user_histories[user.id].append({"role": "user", "content": partner_prompt})
+        try:
+            await update.message.chat.send_action("typing")
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "system", "content": get_system_prompt(country, lang)}] + user_histories[user.id],
+                max_tokens=600,
+                temperature=0.7
+            )
+            reply = response.choices[0].message.content
+            user_histories[user.id].append({"role": "assistant", "content": reply})
+            await update.message.reply_text(reply, reply_markup=get_main_keyboard(lang))
+        except Exception as e:
+            logger.error(f"GPT deeplink partner error: {e}")
+            await update.message.reply_text(
+                t["error_text"].format(sponsor=SPONSOR_USERNAME, phone=phone),
+                reply_markup=get_main_keyboard(lang)
+            )
+        return CHAT
+
+    if start_param == "manager_contact":
+        await update.message.reply_text(
+            t["deeplink_contact"],
+            reply_markup=get_main_keyboard(lang)
+        )
+        await update.message.reply_text(
+            t["contact_text"].format(sponsor=SPONSOR_USERNAME, phone=phone),
+            reply_markup=get_main_keyboard(lang)
+        )
+        return CHAT
+
+    if start_param.startswith("product_"):
+        product_name = start_param.replace("product_", "").replace("_", " ")
+        product_prompt = {
+            "ru": f"Клиент пришёл из мини-приложения и интересуется продуктом: {product_name}. Расскажи коротко и понятно, что это за продукт, для чего он нужен и как его купить со скидкой.",
+            "tk": f"Müşderi mini programmdan geldi we şu önüm bilen gyzyklanýar: {product_name}. Gysga we düşnükli görnüşde bu önümiň nämedigini, näme üçin gerekdigini we arzanladyş bilen nädip satyn alyp bolýandygyny düşündir.",
+            "uz": f"Mijoz mini ilovadan keldi va mana bu mahsulot bilan qiziqyapti: {product_name}. Qisqa va tushunarli tarzda bu mahsulot nima ekanini, nima uchun kerakligini va chegirma bilan qanday xarid qilish mumkinligini tushuntir."
+        }.get(lang)
+        user = update.effective_user
+        if user.id not in user_histories:
+            user_histories[user.id] = []
+        user_histories[user.id].append({"role": "user", "content": product_prompt})
+        try:
+            await update.message.chat.send_action("typing")
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "system", "content": get_system_prompt(country, lang)}] + user_histories[user.id],
+                max_tokens=600,
+                temperature=0.7
+            )
+            reply = response.choices[0].message.content
+            user_histories[user.id].append({"role": "assistant", "content": reply})
+            await update.message.reply_text(reply, reply_markup=get_main_keyboard(lang))
+        except Exception as e:
+            logger.error(f"GPT deeplink product error: {e}")
+            await update.message.reply_text(
+                t["error_text"].format(sponsor=SPONSOR_USERNAME, phone=phone),
+                reply_markup=get_main_keyboard(lang)
+            )
+        return CHAT
+
+    await update.message.reply_text(
+        t["welcome"],
+        parse_mode="Markdown",
+        reply_markup=get_main_keyboard(lang)
+    )
+    return CHAT
+
 # ─── /start — выбор страны ───────────────────────────────────
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    start_param = ""
+    if context.args:
+        start_param = context.args[0].strip()
     context.user_data.clear()
+    context.user_data["start_param"] = start_param
     await update.message.reply_text(
         "🌍 Выберите вашу страну / Choose your country:\n\nТуркменистан 🇹🇲 / O'zbekiston 🇺🇿",
         reply_markup=ReplyKeyboardMarkup(
@@ -300,13 +442,7 @@ async def select_lang(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_histories[user.id] = []
 
-    t = TEXTS[lang]
-    await update.message.reply_text(
-        t["welcome"],
-        parse_mode="Markdown",
-        reply_markup=get_main_keyboard(lang)
-    )
-    return CHAT
+    return await handle_start_param(update, context)
 
 # ─── Основной чат ────────────────────────────────────────────
 async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -316,6 +452,15 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     country = context.user_data.get("country", "TKM")
     phone = get_phone(country)
     t = TEXTS[lang]
+
+    # Кнопка главная
+    if text in [t["home"], "🏠 Главная", "🏠 Baş sahypa", "🏠 Asosiy sahifa"]:
+        await update.message.reply_text(
+            t["welcome"],
+            parse_mode="Markdown",
+            reply_markup=get_main_keyboard(lang)
+        )
+        return CHAT
 
     # Кнопка каталога
     if text in [t["catalog"], "📖 Каталог", "📖 Katalog"]:
