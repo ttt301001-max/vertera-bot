@@ -220,7 +220,8 @@ Vertera — международная компания, основана в 200
 ═══════════════════════════════
 КАК КУПИТЬ / БИЗНЕС
 ═══════════════════════════════
-Покупка со скидкой 30%: нужно зарегистрировать личный кабинет — для этого обратитесь к менеджеру.
+Покупка со скидкой 30%: зарегистрировать личный кабинет по ссылке:
+https://id.boss.vertera.org/register?ref=FEKMPTVL85&service=OS3_PARTNER
 
 Бизнес: рекомендовать продукт окружению → зарабатывать. Первый шаг — попробовать продукт самому.
 Контакт спонсора: +99363327177 (Telegram: @tach_ttt)
@@ -363,12 +364,40 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
             resize_keyboard=True
         )
         business_text = {
-            "ru": "💼 Бизнес с Vertera\n\nВы можете начать сотрудничество с компанией и получить пошаговую поддержку.\n\nВыберите, что хотите сделать дальше:",
-            "tk": "💼 Vertera bilen iş\n\nSiz kompaniýa bilen hyzmatdaşlyga başlap, ädimme-ädim goldaw alyp bilersiňiz.\n\nIndi näme etmek isleýändigiňizi saýlaň:",
-            "uz": "💼 Vertera bilan biznes\n\nSiz kompaniya bilan hamkorlikni boshlashingiz va bosqichma-bosqich yordam olishingiz mumkin.\n\nKeyingi qadamni tanlang:",
+            "ru": (
+                "💼 *Бизнес с Vertera*\n\n"
+                "Vertera — это не просто продукт, это возможность создать стабильный доход.\n\n"
+                "Как это работает:\n"
+                "• Попробуйте продукт сами и убедитесь в результате\n"
+                "• Рекомендуйте его своему окружению\n"
+                "• Получайте доход с каждой продажи\n\n"
+                "Первый шаг — зарегистрировать личный кабинет и попробовать продукт. "
+                "Мы поможем на каждом этапе 🌿"
+            ),
+            "tk": (
+                "💼 *Vertera bilen iş*\n\n"
+                "Vertera — bu diňe bir önüm däl, durnukly girdeji döretmek mümkinçiligi.\n\n"
+                "Bu nähili işleýär:\n"
+                "• Önümi özüňiz synap görüň we netijäni duýuň\n"
+                "• Töweregiňizdäkilere maslahat beriň\n"
+                "• Her satuwdan girdeji alyň\n\n"
+                "Ilkinji ädim — şahsy kabinetini hasaba alyp, önümi synap görmek. "
+                "Her tapgyrda kömek ederis 🌿"
+            ),
+            "uz": (
+                "💼 *Vertera bilan biznes*\n\n"
+                "Vertera — bu faqat mahsulot emas, barqaror daromad yaratish imkoniyati.\n\n"
+                "Bu qanday ishlaydi:\n"
+                "• Mahsulotni o\'zingiz sinab ko\'ring va natijani his qiling\n"
+                "• Atrofingizlarga tavsiya qiling\n"
+                "• Har bir sotuvdan daromad oling\n\n"
+                "Birinchi qadam — shaxsiy kabinetni ro\'yxatdan o\'tkazish va mahsulotni sinab ko\'rish. "
+                "Har bosqichda yordam beramiz 🌿"
+            ),
         }
         await update.message.reply_text(
             business_text.get(lang, business_text["ru"]),
+            parse_mode="Markdown",
             reply_markup=business_menu
         )
         return CHAT
