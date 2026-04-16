@@ -15,7 +15,7 @@ GOOGLE_SHEET_URL = os.getenv("GOOGLE_SHEET_URL", "https://script.google.com/macr
 
 SPONSOR_USERNAME = "@tach_ttt"
 SPONSOR_PHONE = "+99363327177"
-CATALOG_LINK = "https://ponixs92.github.io/vertera-shop/"
+CATALOG_LINK = "https://t.me/Verteratkmbot/vertera_tkm"
 REGISTER_LINK = "https://id.boss.vertera.org/register?ref=FEKMPTVL85&service=OS3_PARTNER"
 
 client = OpenAI(api_key=OPENAI_API_KEY)
