@@ -243,6 +243,162 @@ Vertera — международная компания, основана в 200
 - ВАЖНО: никогда не давай медицинских советов
 """
 
+
+def get_catalog_text(lang: str, country: str) -> str:
+
+    nl = "\n"
+    nn = "\n\n"
+
+    gels_ru = (
+        "🟢 *VERTERA GEL*\n"
+        "Гель из ламинарии. Поддерживает иммунитет, улучшает работу ЖКТ, "
+        "здоровье сердца и сосудов, способствует детоксикации. pH 7.9. "
+        "Употреблять 50–100 г за 30 минут до еды.\n\n"
+        "🔵 *VERTERA FORTE ORIGINAL*\n"
+        "Ламинария + фукус + дигидрокверцетин. "
+        "Усиленная антиоксидантная защита и детоксикация. pH 8.5.\n\n"
+        "🔵 *VERTERA FORTE со вкусами*\n"
+        "Ламинария и фукус с адаптогенами (шиповник, эхинацея, солодка, элеутерококк). "
+        "Вкусы: чёрная смородина, вишня, яблоко. pH 5.\n\n"
+        "💜 *ANGIOLIVE ORIGINAL*\n"
+        "Ламинария + фукус + экстракт красного винограда. "
+        "Поддержка здоровья сосудов, сердца, вен. "
+        "Профилактика варикоза. Норма употребления — 90 г в день.\n\n"
+        "👶 *УМНЫЙ РЕБЁНОК (Smart Kid)*\n"
+        "Детское питание от 3 лет. Содержит более 140 полезных веществ "
+        "и суточную норму йода. Вкусы: яблоко, банан, груша."
+    )
+
+    gels_tk = (
+        "🟢 *VERTERA GEL*\n"
+        "Laminariýadan gel. Immuniteti goldaýar, iýmit siňdirişi we "
+        "ýürek-damar saglygyny gowulandyrýar, detoks edýär. pH 7.9. "
+        "Nahardan 30 minut öň 50–100 g iýmek maslahat berilýär.\n\n"
+        "🔵 *VERTERA FORTE ORIGINAL*\n"
+        "Laminariýa + fukus + digidrokersetin. "
+        "Güýçlendirilen antioksidant gorag we detoks. pH 8.5.\n\n"
+        "🔵 *VERTERA FORTE (tagamly)*\n"
+        "Laminariýa we fukus + adaptogenler (itburun, ehinaseýa, mäşebenlik, eleýterokok). "
+        "Tagamlar: gara smorodina, alça, alma. pH 5.\n\n"
+        "💜 *ANGIOLIVE ORIGINAL*\n"
+        "Laminariýa + fukus + gyzyl üzüm ekstrakty. "
+        "Damarlar we ýürek saglygyny goldaýar, warikozy öňüni alýar. "
+        "Günde 90 g.\n\n"
+        "👶 *AKYLLY ÇAGA (Smart Kid)*\n"
+        "3 ýaşdan çagalar üçin iýmit. 140+ peýdaly madda we günlük ýod normasyny öz içine alýar. "
+        "Tagamlar: alma, banan, armyt."
+    )
+
+    gels_uz = (
+        "🟢 *VERTERA GEL*\n"
+        "Laminariyadagi gel. Immunitetni qo'llab-quvvatlaydi, hazm qilishni, "
+        "yurak va qon tomir sog'ligini yaxshilaydi, detoks qiladi. pH 7.9. "
+        "Ovqatdan 30 daqiqa oldin 50–100 g iste'mol qilish tavsiya etiladi.\n\n"
+        "🔵 *VERTERA FORTE ORIGINAL*\n"
+        "Laminaria + fukus + digidrokvertsetin. "
+        "Kuchaytirilgan antioksidant himoya va detoks. pH 8.5.\n\n"
+        "🔵 *VERTERA FORTE (ta'mli)*\n"
+        "Laminaria va fukus + adaptogenlar (itburun, exinaseya, miya o'ti, eleuterokokk). "
+        "Ta'mlar: qora smorodina, gilos, olma. pH 5.\n\n"
+        "💜 *ANGIOLIVE ORIGINAL*\n"
+        "Laminaria + fukus + qizil uzum ekstrakti. "
+        "Tomir va yurak sog'ligini qo'llab-quvvatlaydi, varikozning oldini oladi. "
+        "Kuniga 90 g.\n\n"
+        "👶 *AQLLI BOLA (Smart Kid)*\n"
+        "3 yoshdan bolalar uchun oziq-ovqat. 140+ foydali modda "
+        "va kunlik yod normasini o'z ichiga oladi. Ta'mlar: olma, banan, nok."
+    )
+
+    cosm_ru = (
+        "💧 *PLASMA THERAPY*\n"
+        "Инновационная косметическая линия на основе технологии Plasma. "
+        "Омолаживает кожу, интенсивно увлажняет, восстанавливает упругость и эластичность. "
+        "Изготовлена по запатентованной биотехнологии нового поколения.\n\n"
+        "✨ *HYDRATE COLLAGEN*\n"
+        "Высокомолекулярный нативный коллаген из кожи пресноводных рыб. "
+        "Увлажняет кожу, сохраняет эластичность и упругость, предотвращает морщины. "
+        "Укрепляет волосы, придаёт блеск и объём.\n\n"
+        "🌿 *BIOMASK FOR FACE*\n"
+        "Фитоводорослевая маска для лица. Интенсивное увлажнение и омоложение. "
+        "Активизирует выработку собственных коллагена и эластина, "
+        "стимулирует защитные функции кожи. Технология Plasma.\n\n"
+        "🫧 *BODY OIL*\n"
+        "Натуральное водорослевое масло для тела. Масла оливы, облепихи, шиповника, "
+        "семян тыквы и льна с дигидрокверцетином. "
+        "Повышает упругость кожи, обладает ранозаживляющим действием. "
+        "Наносить лёгкими движениями на 10–15 минут."
+    )
+
+    cosm_tk = (
+        "💧 *PLASMA THERAPY*\n"
+        "Plasma tehnologiýasyna esaslanýan innowasiýon kosmetika hatary. "
+        "Derini ýaşaldýar, çuňňur nemledýär, çeýeligini we berkligini dikeldýär.\n\n"
+        "✨ *HYDRATE COLLAGEN*\n"
+        "Süýdemsiz balyklaryň derisinden natiw kollagen. "
+        "Derini nemledýär, çyşmaçylygyny saklaýar, gyryşyklary öňüni alýar. "
+        "Saçlary berkidýär, ýalpyldawuklyk we göwrüm berýär.\n\n"
+        "🌿 *BIOMASK FOR FACE*\n"
+        "Ýüz üçin fitosuw ösümligi maskasy. Çuňňur nemlendirme we ýaşartma. "
+        "Öz kollagen we elastin önümçiligini güýçlendirýär. Plasma tehnologiýasy.\n\n"
+        "🫧 *BODY OIL*\n"
+        "Tebigy suw ösümligi beden ýagy. Zeýtun, çaýkanly, itburun, garpyz "
+        "we zygyr tohumlaryndan digidrokersetin bilen baýlaşdyrylan garyndy. "
+        "Deriniň berkligini ýokarlandyrýar."
+    )
+
+    cosm_uz = (
+        "💧 *PLASMA THERAPY*\n"
+        "Plasma texnologiyasiga asoslangan innovatsion kosmetika liniyasi. "
+        "Terini yoshartadi, intensiv namlantiradi, elastiklik va mustahkamlikni tiklaydi.\n\n"
+        "✨ *HYDRATE COLLAGEN*\n"
+        "Chuchuk baliqlar terisidan nativ kollagen. "
+        "Terini namlantiradi, elastikligini saqlaydi, ajinlarning oldini oladi. "
+        "Sochlarga mustahkamlik, porloqlik va hajm beradi.\n\n"
+        "🌿 *BIOMASK FOR FACE*\n"
+        "Yuz uchun fitosuvli niqob. Intensiv namlantirish va yoshartish. "
+        "O'z kollagen va elastin ishlab chiqarishni faollashtiradi. Plasma texnologiyasi.\n\n"
+        "🫧 *BODY OIL*\n"
+        "Tabiiy suv o'simligi tana yog'i. Zaytun, temir yong'oq, itburun, "
+        "oshqovoq urug'i va zigir yog'lari aralashmasi, digidrokvertsetin bilan boyitilgan. "
+        "Teri elastikligini oshiradi, tiklovchi ta'sir ko'rsatadi."
+    )
+
+    sensation_ru = (
+        "🌿 *VERTERA SENSATION*\n"
+        "Уникальная рецептура с 8 натуральными активаторами иммунитета: "
+        "ламинария, фукус, спирулина, экстракт чёрного тмина, бетулин и другие. "
+        "Разработан на основе многолетних научных исследований. "
+        "Технология микрокапсуляции обеспечивает максимальную биодоступность."
+    )
+
+    sensation_uz = (
+        "🌿 *VERTERA SENSATION*\n"
+        "8 ta tabiiy immunitet aktivatori bilan noyob formula: laminaria, fukus, "
+        "spirulina, qora zira ekstrakti, betulin va boshqalar. "
+        "Ko'p yillik ilmiy tadqiqotlar asosida ishlab chiqilgan. "
+        "Mikrokapsulatsiya texnologiyasi maksimal biodostuplikni ta'minlaydi."
+    )
+
+    gels  = {"ru": gels_ru,  "tk": gels_tk,  "uz": gels_uz}
+    cosm  = {"ru": cosm_ru,  "tk": cosm_tk,  "uz": cosm_uz}
+    sens  = {"ru": sensation_ru, "uz": sensation_uz}
+
+    headers = {
+        "ru": ("📖 *Продукция Vertera*\n\n🧴 *ГЕЛИ:*\n\n",  "\n\n💄 *КОСМЕТИКА:*\n\n", "\n\n❓ Есть вопросы? Спрашивайте!"),
+        "tk": ("📖 *Vertera önümleri*\n\n🧴 *GELLER:*\n\n", "\n\n💄 *KOSMETIKA:*\n\n", "\n\n❓ Soraglaryňyz barmy? Soraň!"),
+        "uz": ("📖 *Vertera mahsulotlari*\n\n🧴 *GELLAR:*\n\n", "\n\n💄 *KOSMETIKA:*\n\n", "\n\n❓ Savollaringiz bormi? So'rang!"),
+    }
+
+    h_gel, h_cosm, h_foot = headers.get(lang, headers["ru"])
+    result = h_gel + gels.get(lang, gels_ru) + h_cosm + cosm.get(lang, cosm_ru)
+
+    if country == "UZB":
+        s = sens.get(lang, sens.get("ru", ""))
+        if s:
+            result += "\n\n" + s
+
+    return result + h_foot
+
 def get_main_keyboard(lang: str):
     t = TEXTS[lang]
     return ReplyKeyboardMarkup(
@@ -334,8 +490,10 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Кнопка каталога
     if text in [t["catalog"], "📖 Каталог", "📖 Katalog"]:
+        catalog_text = get_catalog_text(lang, country)
         await update.message.reply_text(
-            t["catalog_text"].format(catalog_link=CATALOG_LINK),
+            catalog_text,
+            parse_mode="Markdown",
             reply_markup=get_main_keyboard(lang)
         )
         return CHAT
