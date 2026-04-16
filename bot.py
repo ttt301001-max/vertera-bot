@@ -30,7 +30,7 @@ SELECT_COUNTRY, SELECT_LANG, CHAT, ANKETA_NAME, ANKETA_PHONE, ANKETA_CITY, ANKET
 
 user_histories = {}
 
-# ─── База данных пользователей (shelve) ──────────────────────
+# ─── База данных + уведомления ───────────────────────────────
 DB_PATH = "/tmp/vertera_users"
 
 def db_save_user(user_id: int, country: str, lang: str):
@@ -53,14 +53,14 @@ def db_set_anketa_started(user_id: int):
         with shelve.open(DB_PATH) as db:
             db[f"anketa_{user_id}"] = {"started_at": datetime.utcnow().isoformat(), "done": False}
     except Exception as e:
-        logger.error(f"DB anketa_started error: {e}")
+        logger.error(f"DB anketa error: {e}")
 
 def db_set_anketa_done(user_id: int):
     try:
         with shelve.open(DB_PATH) as db:
             db[f"anketa_{user_id}"] = {"done": True}
     except Exception as e:
-        logger.error(f"DB anketa_done error: {e}")
+        logger.error(f"DB anketa done error: {e}")
 
 def db_anketa_needs_reminder(user_id: int) -> bool:
     try:
@@ -92,7 +92,7 @@ REMINDER_TEXTS = {
 async def send_anketa_reminder(context) -> None:
     job = context.job
     user_id = job.data["user_id"]
-    lang    = job.data.get("lang", "ru")
+    lang = job.data.get("lang", "ru")
     if not db_anketa_needs_reminder(user_id):
         return
     reminder_text = REMINDER_TEXTS.get(lang, REMINDER_TEXTS["ru"])
@@ -110,7 +110,26 @@ async def send_anketa_reminder(context) -> None:
         )
         logger.info(f"Reminder sent to {user_id}")
     except Exception as e:
-        logger.error(f"Reminder error for {user_id}: {e}")
+        logger.error(f"Reminder send error for {user_id}: {e}")
+
+async def notify_manager(bot, user, country, lang, event: str):
+    country_label = "Туркменистан 🇹🇲" if country == "TKM" else "Узбекистан 🇺🇿"
+    username_str = f"@{user.username}" if user.username else str(user.id)
+    name_str = user.full_name or username_str
+    try:
+        await bot.send_message(
+            chat_id="@tach_ttt",
+            text=(
+                f"{event}\n\n"
+                f"🌍 {country_label}\n"
+                f"🗣 {lang}\n"
+                f"👤 {name_str}\n"
+                f"🆔 {username_str}"
+            )
+        )
+    except Exception as e:
+        logger.error(f"Notify manager error: {e}")
+
 
 # ─── Тексты на разных языках ─────────────────────────────────
 TEXTS = {
@@ -265,21 +284,21 @@ Vertera — международная компания, основана в 200
 ═══════════════════════════════
 
 🟢 VERTERA GEL — гель из ламинарии
-— Поддержка иммунитета, пищеварения, сердца и сосудов
+— Детокс, иммунитет, ЖКТ, сердце и сосуды
 — 6 клинических исследований, pH 7.9
-— Употребляется 50-100 г/сут за 30 минут до еды
+— Употребляется 50-100 г/сут за 30 мин до еды
 
 🔵 VERTERA FORTE ORIGINAL — ламинария + фукус + дигидрокверцетин
-— Усиленная антиоксидантная поддержка, pH 8.5
-— Употребляется ежедневно с едой
+— Усиленный детокс, антиоксидантная защита, pH 8.5
+— Употребляется ежедневно
 
 🔵 VERTERA FORTE со вкусами — Черная смородина, Вишня, Яблоко
 — С адаптогенами (шиповник, эхинацея, солодка, элеутерококк), pH 5
-— Употребляется ежедневно как функциональное питание
+— Употребляется ежедневно
 
 💜 ANGIOLIVE ORIGINAL — ламинария + фукус + экстракт красного винограда
-— Поддержка сосудов, сердца, вен
-— Употребляется 90 г/сут, входит в ежедневный рацион
+— Здоровье сосудов, сердца, вен, профилактика варикоза
+— Клинически доказана, 90 г/сут
 
 👶 УМНЫЙ РЕБЁНОК (Smart Kid) — детское питание
 — Для детей от 3 лет, вкусы: яблоко, банан, груша
@@ -325,8 +344,8 @@ Vertera — международная компания, основана в 200
 - При вопросах о ценах: цены уточнит менеджер
 - Когда человек готов к покупке или хочет узнать больше — предложи заполнить анкету, используй слово "анкету"
 - Не придумывай факты
-- ВАЖНО: Все продукты Vertera — это натуральные ПРОДУКТЫ ПИТАНИЯ и косметика, НЕ лекарства и НЕ БАДы. Никогда не говори "курс лечения", "лечит", "терапия", "дозировка". Вместо этого говори: "употребление", "добавить в рацион", "ежедневное питание", "включить в меню". Продукт не лечит болезни — он поддерживает здоровье как часть здорового питания.
-- ВАЖНО: Никогда не давай медицинских советов и не говори о лечении болезней
+- ВАЖНО: продукты Vertera — это натуральные ПРОДУКТЫ ПИТАНИЯ и косметика, НЕ лекарства. Никогда не используй слова "курс лечения", "лечит", "терапия", "дозировка". Говори: "употреблять", "добавить в рацион", "ежедневное питание", "включить в меню".
+- ВАЖНО: никогда не давай медицинских советов и не говори о лечении болезней
 """
 
 def get_main_keyboard(lang: str):
@@ -455,29 +474,16 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Кнопка купить продукт
     if text in [t["buy"], "🛒 Купить продукт", "🛒 Önüm satyn almak", "🛒 Mahsulot sotib olish"]:
-        # Уведомление менеджеру
-        try:
-            country_label = "Туркменистан 🇹🇲" if country == "TKM" else "Узбекистан 🇺🇿"
-            username_str = f"@{user.username}" if user.username else str(user.id)
-            await context.bot.send_message(
-                chat_id="@tach_ttt",
-                text=f"🛒 Интерес к покупке\n\n🌍 {country_label}\n🗣 {lang}\n👤 {user.full_name or username_str}\n🆔 {username_str}"
-            )
-        except Exception as e:
-            logger.error(f"Buy notify error: {e}")
+        await notify_manager(context.bot, user, country, lang, "🛒 Интерес к покупке")
         buy_menu = ReplyKeyboardMarkup(
-            [
-                [t["anketa_yes"]],
-                [t["register_btn"]],
-                [t["home"]],
-            ],
+            [[t["anketa_yes"]], [t["register_btn"]], [t["home"]]],
             resize_keyboard=True
         )
         buy_text = {
             "ru": (
                 "🛒 *Купить продукт Vertera*\n\n"
                 "Все продукты Vertera можно приобрести со скидкой 30% после регистрации личного кабинета.\n\n"
-                "Чтобы сделать заказ — заполните анкету, и наш менеджер свяжется с вами и поможет с выбором 🌿"
+                "Чтобы сделать заказ — заполните анкету, наш менеджер свяжется с вами и поможет с выбором 🌿"
             ),
             "tk": (
                 "🛒 *Vertera önümini satyn almak*\n\n"
@@ -499,22 +505,9 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Кнопка бизнес
     if text in [t["business"], "💼 Бизнес с Vertera", "💼 Vertera bilen iş", "💼 Vertera bilan biznes"]:
-        # Уведомление менеджеру
-        try:
-            country_label = "Туркменистан 🇹🇲" if country == "TKM" else "Узбекистан 🇺🇿"
-            username_str = f"@{user.username}" if user.username else str(user.id)
-            await context.bot.send_message(
-                chat_id="@tach_ttt",
-                text=f"💼 Интерес к бизнесу\n\n🌍 {country_label}\n🗣 {lang}\n👤 {user.full_name or username_str}\n🆔 {username_str}"
-            )
-        except Exception as e:
-            logger.error(f"Biz notify error: {e}")
+        await notify_manager(context.bot, user, country, lang, "💼 Интерес к бизнесу")
         business_menu = ReplyKeyboardMarkup(
-            [
-                [t["anketa_yes"]],
-                [t["register_btn"]],
-                [t["home"]],
-            ],
+            [[t["anketa_yes"]], [t["register_btn"]], [t["home"]]],
             resize_keyboard=True
         )
         business_text = {
@@ -583,6 +576,24 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return CHAT
 
+    # Кнопки да/нет анкеты — ловим здесь (надёжнее Regex)
+    yes_variants = [
+        "✅ Да, заполнить анкету",
+        "✅ Hawa, anketa doldurmak",
+        "✅ Ha, anketa to\'ldirish",
+        t.get("anketa_yes", ""),
+    ]
+    no_variants = [
+        "❌ Нет, продолжить общение",
+        "❌ Ýok, gürrüňdeşligi dowam etmek",
+        "❌ Yo\'q, suhbatni davom ettirish",
+        t.get("anketa_no", ""),
+    ]
+    if text in yes_variants:
+        return await start_anketa(update, context)
+    if text in no_variants:
+        return await start_anketa(update, context)
+
     # GPT
     if user.id not in user_histories:
         user_histories[user.id] = []
@@ -623,19 +634,23 @@ async def start_anketa(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lang = context.user_data.get("lang", "ru")
     country = context.user_data.get("country", "TKM")
     t = TEXTS[lang]
+    user = update.effective_user
+    msg = update.message.text
+
+    # Все варианты "нет" на всех языках
     no_variants = [
-        t["anketa_no"],
         "❌ Нет, продолжить общение",
         "❌ Ýok, gürrüňdeşligi dowam etmek",
         "❌ Yo'q, suhbatni davom ettirish",
+        t.get("anketa_no", ""),
     ]
-    if update.message.text in no_variants:
+    if msg in no_variants:
         await update.message.reply_text(t["anketa_ok"], reply_markup=get_main_keyboard(lang))
         return CHAT
-    user = update.effective_user
+
     # Фиксируем начало анкеты
     db_set_anketa_started(user.id)
-    # Ставим напоминание через 24 часа
+    # Напоминание через 24 часа
     job_name = f"reminder_{user.id}"
     for job in context.job_queue.get_jobs_by_name(job_name):
         job.schedule_removal()
@@ -681,7 +696,7 @@ async def anketa_interest(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     context.user_data["interest"] = update.message.text
 
-    # Анкета завершена — отменяем напоминание
+    # Анкета завершена
     db_set_anketa_done(user.id)
     for job in context.job_queue.get_jobs_by_name(f"reminder_{user.id}"):
         job.schedule_removal()
@@ -731,26 +746,12 @@ async def anketa_interest(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
-    anketa_yes_patterns = [
-        "✅ Да, заполнить анкету",
-        "✅ Hawa, anketa to\'ldirish",
-        "✅ Hawa, anketa doldurmak",
-        "✅ Ha, anketa to\'ldirish",
-    ]
-    anketa_no_patterns = [
-        "❌ Нет, продолжить общение",
-        "❌ Yo\'q, suhbatni davom ettirish",
-        "❌ Ýok, gürrüňdeşligi dowam etmek",
-    ]
-
     conv = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
             SELECT_COUNTRY: [MessageHandler(filters.TEXT & ~filters.COMMAND, select_country)],
             SELECT_LANG: [MessageHandler(filters.TEXT & ~filters.COMMAND, select_lang)],
             CHAT: [
-                MessageHandler(filters.Regex("^(" + "|".join(anketa_yes_patterns) + ")$"), start_anketa),
-                MessageHandler(filters.Regex("^(" + "|".join(anketa_no_patterns) + ")$"), start_anketa),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, chat_with_gpt),
             ],
             ANKETA_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, anketa_name)],
