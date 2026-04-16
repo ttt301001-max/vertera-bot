@@ -691,7 +691,7 @@ async def anketa_interest(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ─── main ─────────────────────────────────────────────────────
 def main():
-    app = Application.builder().token(BOT_TOKEN).job_queue(True).build()
+    app = Application.builder().token(BOT_TOKEN).build()
 
     anketa_yes_patterns = [
         "✅ Да, заполнить анкету",
