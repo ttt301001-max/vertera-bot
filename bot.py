@@ -354,7 +354,24 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Кнопка бизнес
     if text in [t["business"], "💼 Бизнес с Vertera", "💼 Vertera bilen iş", "💼 Vertera bilan biznes"]:
-        text = "Расскажи подробно про бизнес-возможности Vertera — как зарабатывать, первые шаги."
+        business_menu = ReplyKeyboardMarkup(
+            [
+                [t["anketa_yes"]],
+                [t["register_btn"]],
+                [t["home"]],
+            ],
+            resize_keyboard=True
+        )
+        business_text = {
+            "ru": "💼 Бизнес с Vertera\n\nВы можете начать сотрудничество с компанией и получить пошаговую поддержку.\n\nВыберите, что хотите сделать дальше:",
+            "tk": "💼 Vertera bilen iş\n\nSiz kompaniýa bilen hyzmatdaşlyga başlap, ädimme-ädim goldaw alyp bilersiňiz.\n\nIndi näme etmek isleýändigiňizi saýlaň:",
+            "uz": "💼 Vertera bilan biznes\n\nSiz kompaniya bilan hamkorlikni boshlashingiz va bosqichma-bosqich yordam olishingiz mumkin.\n\nKeyingi qadamni tanlang:",
+        }
+        await update.message.reply_text(
+            business_text.get(lang, business_text["ru"]),
+            reply_markup=business_menu
+        )
+        return CHAT
 
     # Кнопка инструкция регистрации
     if text == t.get("register_btn"):
