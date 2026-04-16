@@ -220,8 +220,7 @@ Vertera — международная компания, основана в 200
 ═══════════════════════════════
 КАК КУПИТЬ / БИЗНЕС
 ═══════════════════════════════
-Покупка со скидкой 30%: зарегистрировать личный кабинет по ссылке:
-https://id.boss.vertera.org/register?ref=FEKMPTVL85&service=OS3_PARTNER
+Покупка со скидкой 30%: нужно зарегистрировать личный кабинет — для этого обратитесь к менеджеру.
 
 Бизнес: рекомендовать продукт окружению → зарабатывать. Первый шаг — попробовать продукт самому.
 Контакт спонсора: +99363327177 (Telegram: @tach_ttt)
@@ -388,10 +387,10 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "💼 *Vertera bilan biznes*\n\n"
                 "Vertera — bu faqat mahsulot emas, barqaror daromad yaratish imkoniyati.\n\n"
                 "Bu qanday ishlaydi:\n"
-                "• Mahsulotni o\'zingiz sinab ko\'ring va natijani his qiling\n"
+                "• Mahsulotni o'zingiz sinab ko'ring va natijani his qiling\n"
                 "• Atrofingizlarga tavsiya qiling\n"
                 "• Har bir sotuvdan daromad oling\n\n"
-                "Birinchi qadam — shaxsiy kabinetni ro\'yxatdan o\'tkazish va mahsulotni sinab ko\'rish. "
+                "Birinchi qadam — shaxsiy kabinetni ro'yxatdan o'tkazish va mahsulotni sinab ko'rish. "
                 "Har bosqichda yordam beramiz 🌿"
             ),
         }
