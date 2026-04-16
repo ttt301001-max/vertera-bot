@@ -1,6 +1,8 @@
 import os
 import logging
 import httpx
+import shelve
+from datetime import datetime
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
@@ -27,6 +29,121 @@ logger = logging.getLogger(__name__)
 SELECT_COUNTRY, SELECT_LANG, CHAT, ANKETA_NAME, ANKETA_PHONE, ANKETA_CITY, ANKETA_INTEREST = range(7)
 
 user_histories = {}
+
+# ─── База данных пользователей (shelve) ──────────────────────
+DB_PATH = "/tmp/vertera_users"
+
+def db_save_user(user_id: int, country: str, lang: str):
+    try:
+        with shelve.open(DB_PATH) as db:
+            db[str(user_id)] = {"country": country, "lang": lang}
+    except Exception as e:
+        logger.error(f"DB save error: {e}")
+
+def db_load_user(user_id: int):
+    try:
+        with shelve.open(DB_PATH) as db:
+            return db.get(str(user_id))
+    except Exception as e:
+        logger.error(f"DB load error: {e}")
+        return None
+
+def db_set_anketa_started(user_id: int):
+    """Фиксируем что анкета была начата."""
+    try:
+        with shelve.open(DB_PATH) as db:
+            key = f"anketa_{user_id}"
+            db[key] = {"started_at": datetime.utcnow().isoformat(), "done": False}
+    except Exception as e:
+        logger.error(f"DB anketa_started error: {e}")
+
+def db_set_anketa_done(user_id: int):
+    """Фиксируем что анкета завершена — не нужно напоминать."""
+    try:
+        with shelve.open(DB_PATH) as db:
+            key = f"anketa_{user_id}"
+            db[key] = {"done": True}
+    except Exception as e:
+        logger.error(f"DB anketa_done error: {e}")
+
+def db_anketa_needs_reminder(user_id: int) -> bool:
+    """True если анкета была начата но не завершена."""
+    try:
+        with shelve.open(DB_PATH) as db:
+            data = db.get(f"anketa_{user_id}")
+            return bool(data and not data.get("done"))
+    except Exception as e:
+        logger.error(f"DB reminder check error: {e}")
+        return False
+
+async def notify_manager(context, user, country, lang, event: str, extra: str = ""):
+    """Отправляет менеджеру уведомление о действии пользователя."""
+    country_label = "Туркменистан 🇹🇲" if country == "TKM" else "Узбекистан 🇺🇿"
+    username = f"@{user.username}" if user.username else str(user.id)
+    name_str = user.full_name or username
+    try:
+        await context.bot.send_message(
+            chat_id="@tach_ttt",
+            text=(
+                f"{event}\n\n"
+                f"🌍 Страна: {country_label}\n"
+                f"🗣 Язык: {lang}\n"
+                f"👤 {name_str}\n"
+                f"🆔 {username}"
+                + (f"\n{extra}" if extra else "")
+            )
+        )
+    except Exception as e:
+        logger.error(f"Notify manager error: {e}")
+
+# ─── Напоминание через 24 часа ────────────────────────────────
+REMINDER_TEXTS = {
+    "ru": (
+        "👋 Привет! Вы начали заполнять анкету, но не завершили.\n\n"
+        "Это займёт всего 1 минуту 📝\n"
+        "Нажмите *«✅ Да, заполнить анкету»* чтобы продолжить."
+    ),
+    "tk": (
+        "👋 Salam! Siz anketa doldurmaga başladyňyz, ýöne tamamlamadyňyz.\n\n"
+        "Bu diňe 1 minut alar 📝\n"
+        "*«✅ Hawa, anketa doldurmak»* düwmesine basyň."
+    ),
+    "uz": (
+        "👋 Salom! Siz anketa to'ldirishni boshladingiz, lekin tugatmadingiz.\n\n"
+        "Bu atigi 1 daqiqa oladi 📝\n"
+        "*«✅ Ha, anketa to'ldirish»* tugmasini bosing."
+    ),
+}
+
+async def send_anketa_reminder(context) -> None:
+    """Job: напоминание пользователю через 24 часа после незавершённой анкеты."""
+    job = context.job
+    user_id = job.data["user_id"]
+    lang    = job.data.get("lang", "ru")
+
+    # Проверяем — вдруг анкету уже заполнили
+    if not db_anketa_needs_reminder(user_id):
+        return
+
+    reminder_text = REMINDER_TEXTS.get(lang, REMINDER_TEXTS["ru"])
+    lang_data = TEXTS.get(lang, TEXTS["ru"])
+    country = job.data.get("country", "TKM")
+
+    keyboard = ReplyKeyboardMarkup(
+        [[lang_data["anketa_yes"]], [lang_data["anketa_no"]]],
+        resize_keyboard=True
+    )
+    try:
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=reminder_text,
+            parse_mode="Markdown",
+            reply_markup=keyboard
+        )
+        logger.info(f"Reminder sent to user {user_id}")
+    except Exception as e:
+        logger.error(f"Reminder send error for {user_id}: {e}")
+
 
 # ─── Тексты на разных языках ─────────────────────────────────
 TEXTS = {
@@ -220,7 +337,8 @@ Vertera — международная компания, основана в 200
 ═══════════════════════════════
 КАК КУПИТЬ / БИЗНЕС
 ═══════════════════════════════
-Покупка со скидкой 30%: нужно зарегистрировать личный кабинет — для этого обратитесь к менеджеру.
+Покупка со скидкой 30%: зарегистрировать личный кабинет по ссылке:
+https://id.boss.vertera.org/register?ref=FEKMPTVL85&service=OS3_PARTNER
 
 Бизнес: рекомендовать продукт окружению → зарабатывать. Первый шаг — попробовать продукт самому.
 Контакт спонсора: +99363327177 (Telegram: @tach_ttt)
@@ -257,6 +375,28 @@ def get_phone(country: str) -> str:
 
 # ─── /start — выбор страны ───────────────────────────────────
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+
+    # ── Восстанавливаем сохранённые страну/язык ──────────────
+    saved = db_load_user(user.id)
+    if saved:
+        context.user_data["country"] = saved["country"]
+        context.user_data["lang"]    = saved["lang"]
+        lang    = saved["lang"]
+        country = saved["country"]
+        t_      = TEXTS[lang]
+        user_histories[user.id] = []
+        flag  = "🇹🇲" if country == "TKM" else "🇺🇿"
+        cname = ("Türkmenistan" if lang == "tk" else "Туркменистан") if country == "TKM" \
+                else ("O'zbekiston" if lang == "uz" else "Узбекистан")
+        await update.message.reply_text(
+            f"👋 {flag} {cname}\n\n" + t_["welcome"],
+            parse_mode="Markdown",
+            reply_markup=get_main_keyboard(lang)
+        )
+        return CHAT
+
+    # ── Первый запуск — выбор страны ─────────────────────────
     context.user_data.clear()
     await update.message.reply_text(
         "🌍 Выберите вашу страну / Choose your country:\n\nТуркменистан 🇹🇲 / O'zbekiston 🇺🇿",
@@ -305,6 +445,7 @@ async def select_lang(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["lang"] = lang
     user = update.effective_user
     user_histories[user.id] = []
+    db_save_user(user.id, country, lang)
 
     t = TEXTS[lang]
     await update.message.reply_text(
@@ -349,11 +490,13 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return CHAT
 
     # Кнопка купить продукт
-    if text in [t["buy"], "🛒 Купить продукт"]:
+    if text in [t["buy"], "🛒 Купить продукт", "🛒 Önüm satyn almak", "🛒 Mahsulot sotib olish"]:
+        await notify_manager(context, user, country, lang, "🛒 Интерес к покупке")
         text = "Хочу купить продукт Vertera. Расскажи подробнее о продуктах и как сделать заказ со скидкой."
 
     # Кнопка бизнес
     if text in [t["business"], "💼 Бизнес с Vertera", "💼 Vertera bilen iş", "💼 Vertera bilan biznes"]:
+        await notify_manager(context, user, country, lang, "💼 Интерес к бизнесу")
         business_menu = ReplyKeyboardMarkup(
             [
                 [t["anketa_yes"]],
@@ -363,40 +506,12 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
             resize_keyboard=True
         )
         business_text = {
-            "ru": (
-                "💼 *Бизнес с Vertera*\n\n"
-                "Vertera — это не просто продукт, это возможность создать стабильный доход.\n\n"
-                "Как это работает:\n"
-                "• Попробуйте продукт сами и убедитесь в результате\n"
-                "• Рекомендуйте его своему окружению\n"
-                "• Получайте доход с каждой продажи\n\n"
-                "Первый шаг — зарегистрировать личный кабинет и попробовать продукт. "
-                "Мы поможем на каждом этапе 🌿"
-            ),
-            "tk": (
-                "💼 *Vertera bilen iş*\n\n"
-                "Vertera — bu diňe bir önüm däl, durnukly girdeji döretmek mümkinçiligi.\n\n"
-                "Bu nähili işleýär:\n"
-                "• Önümi özüňiz synap görüň we netijäni duýuň\n"
-                "• Töweregiňizdäkilere maslahat beriň\n"
-                "• Her satuwdan girdeji alyň\n\n"
-                "Ilkinji ädim — şahsy kabinetini hasaba alyp, önümi synap görmek. "
-                "Her tapgyrda kömek ederis 🌿"
-            ),
-            "uz": (
-                "💼 *Vertera bilan biznes*\n\n"
-                "Vertera — bu faqat mahsulot emas, barqaror daromad yaratish imkoniyati.\n\n"
-                "Bu qanday ishlaydi:\n"
-                "• Mahsulotni o'zingiz sinab ko'ring va natijani his qiling\n"
-                "• Atrofingizlarga tavsiya qiling\n"
-                "• Har bir sotuvdan daromad oling\n\n"
-                "Birinchi qadam — shaxsiy kabinetni ro'yxatdan o'tkazish va mahsulotni sinab ko'rish. "
-                "Har bosqichda yordam beramiz 🌿"
-            ),
+            "ru": "💼 Бизнес с Vertera\n\nВы можете начать сотрудничество с компанией и получить пошаговую поддержку.\n\nВыберите, что хотите сделать дальше:",
+            "tk": "💼 Vertera bilen iş\n\nSiz kompaniýa bilen hyzmatdaşlyga başlap, ädimme-ädim goldaw alyp bilersiňiz.\n\nIndi näme etmek isleýändigiňizi saýlaň:",
+            "uz": "💼 Vertera bilan biznes\n\nSiz kompaniya bilan hamkorlikni boshlashingiz va bosqichma-bosqich yordam olishingiz mumkin.\n\nKeyingi qadamni tanlang:",
         }
         await update.message.reply_text(
             business_text.get(lang, business_text["ru"]),
-            parse_mode="Markdown",
             reply_markup=business_menu
         )
         return CHAT
@@ -466,10 +581,33 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ─── Анкета ──────────────────────────────────────────────────
 async def start_anketa(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lang = context.user_data.get("lang", "ru")
+    country = context.user_data.get("country", "TKM")
     t = TEXTS[lang]
     if update.message.text == t["anketa_no"]:
         await update.message.reply_text(t["anketa_ok"], reply_markup=get_main_keyboard(lang))
         return CHAT
+
+    user = update.effective_user
+
+    # Фиксируем начало анкеты
+    db_set_anketa_started(user.id)
+
+    # Ставим напоминание через 24 часа если не завершит
+    job_name = f"reminder_{user.id}"
+    # Удаляем старый job если был
+    current_jobs = context.job_queue.get_jobs_by_name(job_name)
+    for job in current_jobs:
+        job.schedule_removal()
+    # Новый job через 86400 секунд (24 часа)
+    context.job_queue.run_once(
+        send_anketa_reminder,
+        when=86400,
+        data={"user_id": user.id, "lang": lang, "country": country},
+        name=job_name,
+        chat_id=user.id,
+        user_id=user.id,
+    )
+
     await update.message.reply_text(t["anketa_start"], reply_markup=ReplyKeyboardRemove())
     return ANKETA_NAME
 
@@ -503,6 +641,12 @@ async def anketa_interest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     t = TEXTS[lang]
 
     context.user_data["interest"] = update.message.text
+
+    # Анкета завершена — отменяем напоминание
+    db_set_anketa_done(user.id)
+    job_name = f"reminder_{user.id}"
+    for job in context.job_queue.get_jobs_by_name(job_name):
+        job.schedule_removal()
 
     name = context.user_data.get("name", "—")
     user_phone = context.user_data.get("phone_user", "—")
@@ -547,7 +691,7 @@ async def anketa_interest(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ─── main ─────────────────────────────────────────────────────
 def main():
-    app = Application.builder().token(BOT_TOKEN).build()
+    app = Application.builder().token(BOT_TOKEN).job_queue(True).build()
 
     anketa_yes_patterns = [
         "✅ Да, заполнить анкету",
