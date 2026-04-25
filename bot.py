@@ -14,6 +14,8 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 GOOGLE_SHEET_URL = os.getenv("GOOGLE_SHEET_URL", "https://script.google.com/macros/s/AKfycbzqwkgp8nSXxtSN1VB16QObhcOgqY4ye45-_Xmpc9OgAQnhQLAdL3EcjcSSg8zz05c/exec")
 
 SPONSOR_USERNAME = "@tach_ttt"
+# ↓ Вставь числовой ID аккаунта @tach_ttt (узнать через @userinfobot)
+MANAGER_CHAT_ID = 699255285  # @tach_ttt
 SPONSOR_PHONE_TKM = "+99363327177"
 SPONSOR_PHONE_UZB = "+99363327177"
 CATALOG_LINK = "https://t.me/Verteratkmbot/vertera_tkm"
@@ -37,7 +39,6 @@ TEXTS = {
         "catalog": "📖 Каталог",
         "contact": "📞 Связаться",
         "home": "🔙 Главная",
-        "change_lang": "🌐 Сменить страну / язык",
         "register_btn": "📋 Инструкция по регистрации",
         "catalog_text": "📖 Наш каталог продукции Vertera:\n{catalog_link}\n\nЕсть вопросы по продуктам? Спрашивай!",
         "contact_text": "📞 Свяжитесь с нашим менеджером:\n\nTelegram: {sponsor}\nТелефон: {phone}\n\nОтвечаем быстро! 🌿",
@@ -61,7 +62,6 @@ TEXTS = {
         "catalog": "📖 Katalog",
         "contact": "📞 Habarlaşmak",
         "home": "🔙 Baş sahypa",
-        "change_lang": "🌐 Ýurt / dil çalyşmak",
         "register_btn": "📋 Hasaba alyş görkezmeleri",
         "catalog_text": "📖 Vertera önümlerimiziň katalogy:\n{catalog_link}\n\nÖnümler barada soraglaryňyz barmy? Soraň!",
         "contact_text": "📞 Menejerimiz bilen habarlaşyň:\n\nTelegram: {sponsor}\nTelefon: {phone}\n\nTiz jogap berýäris! 🌿",
@@ -85,7 +85,6 @@ TEXTS = {
         "catalog": "📖 Katalog",
         "contact": "📞 Bog'lanish",
         "home": "🔙 Bosh sahifa",
-        "change_lang": "🌐 Mamlakat / til o'zgartirish",
         "register_btn": "📋 Ro'yxatdan o'tish",
         "catalog_text": "📖 Vertera mahsulotlari katalogi:\n{catalog_link}\n\nMahsulotlar haqida savollaringiz bormi? So'rang!",
         "contact_text": "📞 Menejerimiz bilan bog'laning:\n\nTelegram: {sponsor}\nTelefon: {phone}\n\nTez javob beramiz! 🌿",
@@ -407,7 +406,7 @@ def get_main_keyboard(lang: str):
     return ReplyKeyboardMarkup(
         [[t["buy"], t["business"]],
          [t["catalog"], t["contact"]],
-         [t["change_lang"]]],
+         [t["home"]]],
         resize_keyboard=True
     )
 
@@ -482,19 +481,6 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     phone = get_phone(country)
     t = TEXTS[lang]
 
-    # Кнопка смены страны/языка
-    if text in [t.get("change_lang",""), "🌐 Сменить страну / язык", "🌐 Ýurt / dil çalyşmak", "🌐 Mamlakat / til o'zgartirish"]:
-        context.user_data.clear()
-        user_histories.pop(user.id, None)
-        await update.message.reply_text(
-            "🌍 Выберите вашу страну / Choose your country:\n\nТуркменистан 🇹🇲 / O'zbekiston 🇺🇿",
-            reply_markup=ReplyKeyboardMarkup(
-                [["🇹🇲 Туркменистан", "🇺🇿 Узбекистан / O'zbekiston"]],
-                resize_keyboard=True, one_time_keyboard=True
-            )
-        )
-        return SELECT_COUNTRY
-
     # Кнопка главная
     if text in [t["home"], "🔙 Главная", "🔙 Baş sahypa", "🔙 Bosh sahifa"]:
         await update.message.reply_text(
@@ -528,7 +514,7 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
             country_label = "Туркменистан 🇹🇲" if country == "TKM" else "Узбекистан 🇺🇿"
             uname = f"@{user.username}" if user.username else str(user.id)
             await context.bot.send_message(
-                chat_id="@tach_ttt",
+                chat_id=MANAGER_CHAT_ID,
                 text=f"🛒 Интерес к покупке\n🌍 {country_label} | 🗣 {lang}\n👤 {user.full_name or uname} | 🆔 {uname}"
             )
         except Exception as e:
@@ -567,7 +553,7 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
             country_label = "Туркменистан 🇹🇲" if country == "TKM" else "Узбекистан 🇺🇿"
             uname = f"@{user.username}" if user.username else str(user.id)
             await context.bot.send_message(
-                chat_id="@tach_ttt",
+                chat_id=MANAGER_CHAT_ID,
                 text=f"💼 Интерес к бизнесу\n🌍 {country_label} | 🗣 {lang}\n👤 {user.full_name or uname} | 🆔 {uname}"
             )
         except Exception as e:
@@ -761,7 +747,7 @@ async def anketa_interest(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         await context.bot.send_message(
-            chat_id="@tach_ttt",
+            chat_id=MANAGER_CHAT_ID,
             text=(
                 f"📥 Новая заявка Vertera!\n\n"
                 f"🌍 Страна: {country_label}\n"
