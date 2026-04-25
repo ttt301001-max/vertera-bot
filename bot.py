@@ -745,8 +745,6 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "tk": "📖 Katalogumuzy Mini App-da açyň:\n\n👉 https://t.me/Verteratkmbot/vertera_tkm\n\nOrada ähli önümler suratlar, beýanlar we bahalar bilen 🌿",
             "uz": "📖 Katalogimizni Mini App-da oching:\n\n👉 https://t.me/Verteratkmbot/vertera_tkm\n\nU yerda barcha mahsulotlar rasmlar, tavsiflar va narxlar bilan 🌿",
         }
-        db_set_catalog_viewed(user.id)
-        schedule_catalog_reminder(context, user.id, lang)
         await update.message.reply_text(
             mini_app_text.get(lang, mini_app_text["ru"]),
             reply_markup=get_main_keyboard(lang)
