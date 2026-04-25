@@ -16,7 +16,7 @@ GOOGLE_SHEET_URL = os.getenv("GOOGLE_SHEET_URL", "https://script.google.com/macr
 SPONSOR_USERNAME = "@tach_ttt"
 MANAGER_CHAT_ID = 699255285  # @tach_ttt
 SPONSOR_PHONE_TKM = "+99363327177"
-SPONSOR_PHONE_UZB = "+998774301234"
+SPONSOR_PHONE_UZB = "+99363327177"
 CATALOG_LINK = "https://t.me/Verteratkmbot/vertera_tkm"
 REGISTER_LINK = "https://id.boss.vertera.org/register?ref=FEKMPTVL85&service=OS3_PARTNER"
 
@@ -25,9 +25,257 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ─── Состояния ───────────────────────────────────────────────
-SELECT_COUNTRY, SELECT_LANG, CHAT, ANKETA_NAME, ANKETA_PHONE, ANKETA_CITY, ANKETA_INTEREST = range(7)
+SELECT_COUNTRY, SELECT_LANG, CHAT, ANKETA_NAME, ANKETA_PHONE, ANKETA_CITY, ANKETA_INTEREST, PARTNER_ID, PARTNER_MENU, PARTNER_CONTACTS_NAME, PARTNER_CONTACTS_PHONE = range(12)
 
 user_histories = {}
+
+# ─── Партнёрский раздел ──────────────────────────────────────
+import json, pathlib
+
+PARTNERS_FILE = pathlib.Path("/tmp/vertera_partners.json")
+
+def partners_load() -> dict:
+    """Загружает одобренных партнёров {user_id: {name, company_id, lang}}"""
+    try:
+        if PARTNERS_FILE.exists():
+            return json.loads(PARTNERS_FILE.read_text())
+    except Exception as e:
+        logger.error(f"partners_load: {e}")
+    return {}
+
+def partners_save(data: dict):
+    try:
+        PARTNERS_FILE.write_text(json.dumps(data, ensure_ascii=False))
+    except Exception as e:
+        logger.error(f"partners_save: {e}")
+
+def partner_add(user_id: int, name: str, company_id: str, lang: str):
+    data = partners_load()
+    data[str(user_id)] = {"name": name, "company_id": company_id, "lang": lang}
+    partners_save(data)
+
+def partner_remove(user_id: int):
+    data = partners_load()
+    data.pop(str(user_id), None)
+    partners_save(data)
+
+def is_partner(user_id: int) -> bool:
+    return str(user_id) in partners_load()
+
+def get_all_partners() -> dict:
+    return partners_load()
+
+# Pending requests {user_id: {name, company_id, lang, tg_username}}
+PENDING_FILE = pathlib.Path("/tmp/vertera_pending.json")
+
+def pending_load() -> dict:
+    try:
+        if PENDING_FILE.exists():
+            return json.loads(PENDING_FILE.read_text())
+    except Exception as e:
+        logger.error(f"pending_load: {e}")
+    return {}
+
+def pending_save(data: dict):
+    try:
+        PENDING_FILE.write_text(json.dumps(data, ensure_ascii=False))
+    except Exception as e:
+        logger.error(f"pending_save: {e}")
+
+def pending_add(user_id: int, info: dict):
+    data = pending_load()
+    data[str(user_id)] = info
+    pending_save(data)
+
+def pending_get(user_id: int) -> dict:
+    return pending_load().get(str(user_id), {})
+
+def pending_remove(user_id: int):
+    data = pending_load()
+    data.pop(str(user_id), None)
+    pending_save(data)
+
+# Contacts {partner_user_id: [{name, phone, status, note}]}
+CONTACTS_FILE = pathlib.Path("/tmp/vertera_contacts.json")
+
+def contacts_load(partner_id: int) -> list:
+    try:
+        if CONTACTS_FILE.exists():
+            all_c = json.loads(CONTACTS_FILE.read_text())
+            return all_c.get(str(partner_id), [])
+    except Exception as e:
+        logger.error(f"contacts_load: {e}")
+    return []
+
+def contacts_save_all(data: dict):
+    try:
+        CONTACTS_FILE.write_text(json.dumps(data, ensure_ascii=False))
+    except Exception as e:
+        logger.error(f"contacts_save: {e}")
+
+def contact_add(partner_id: int, name: str, phone: str):
+    try:
+        all_c = {}
+        if CONTACTS_FILE.exists():
+            all_c = json.loads(CONTACTS_FILE.read_text())
+        lst = all_c.get(str(partner_id), [])
+        lst.append({"name": name, "phone": phone, "status": "новый"})
+        all_c[str(partner_id)] = lst
+        contacts_save_all(all_c)
+    except Exception as e:
+        logger.error(f"contact_add: {e}")
+
+# Тексты партнёрского раздела
+PARTNER_TEXTS = {
+    "ru": {
+        "btn":        "🤝 Я партнёр",
+        "ask_id":     "🤝 Введите ваш ID из личного кабинета Vertera:",
+        "wait":       "✅ Запрос отправлен! Ожидайте одобрения от администратора.",
+        "approved":   "🎉 Вы одобрены как партнёр Vertera! Добро пожаловать в команду 🌿",
+        "rejected":   "❌ Ваш запрос отклонён. Обратитесь к менеджеру: @tach_ttt",
+        "menu_title": "🤝 Партнёрское меню",
+        "btn_learn":  "📚 Обучение",
+        "btn_market": "📊 Маркетинг",
+        "btn_calc":   "🧮 Калькулятор дохода",
+        "btn_contacts":"👥 Мои контакты",
+        "btn_news":   "📣 Новости",
+        "btn_back":   "🔙 Выйти из партнёрского меню",
+        "learn_text": (
+            "📚 *Обучение партнёра*\n\n"
+            "*Шаг 1 — Изучи продукт*\n"
+            "Попробуй все продукты сам. Только личный опыт убеждает.\n\n"
+            "*Шаг 2 — Изучи систему*\n"
+            "БЗП → Клубный бонус → КББ → БЗК\n"
+            "Нажми «📊 Маркетинг» для подробного разбора.\n\n"
+            "*Шаг 3 — Первые шаги*\n"
+            "• Составь список из 20 знакомых\n"
+            "• Расскажи о продукте 5 из них\n"
+            "• Пригласи 2 в команду (левая и правая ветка)\n\n"
+            "*Шаг 4 — Сопровождение*\n"
+            "Добавляй клиентов в «👥 Мои контакты» и следи за их статусом 🌿"
+        ),
+        "market_text": (
+            "📊 *Маркетинг Vertera*\n\n"
+            "У вас 4 бонуса с первых дней:\n\n"
+            "1️⃣ *БЗП* — 40% с покупки партнёра\n"
+            "2️⃣ *Клубный бонус* — 55 или 110 UE за объём первой линии\n"
+            "3️⃣ *КББ* — за каждый цикл 40+40 PV в ветках\n"
+            "4️⃣ *БЗК* — разовая выплата за новый статус\n\n"
+            "1 UE = 15 манат (TKM) / 10 000 сум (UZB)\n\n"
+            "Задай вопрос боту — он объяснит любой бонус подробно 🌿"
+        ),
+        "calc_ask":   "🧮 Введите количество активных партнёров в вашей команде:",
+        "contacts_empty": "👥 У вас пока нет контактов. Добавьте первого!",
+        "contacts_add":   "➕ Добавить контакт",
+        "contacts_ask_name": "👤 Введите имя контакта:",
+        "contacts_ask_phone": "📞 Введите телефон контакта:",
+        "contacts_saved": "✅ Контакт добавлен!",
+        "news_text":  "📣 Новостей пока нет. Следите за обновлениями 🌿",
+    },
+    "tk": {
+        "btn":        "🤝 Men hyzmatdaş",
+        "ask_id":     "🤝 Vertera şahsy kabinetindäki ID-ňizi giriziň:",
+        "wait":       "✅ Isleg iberildi! Administratoryň tassyklamagyna garaşyň.",
+        "approved":   "🎉 Siz Vertera hyzmatdaşy hökmünde tassyklandyňyz! Topara hoş geldiňiz 🌿",
+        "rejected":   "❌ Ýüz tutmanyňyz ret edildi. Menejer bilen habarlaşyň: @tach_ttt",
+        "menu_title": "🤝 Hyzmatdaş menýusy",
+        "btn_learn":  "📚 Okuw",
+        "btn_market": "📊 Marketing",
+        "btn_calc":   "🧮 Girdeji kalkulýatory",
+        "btn_contacts":"👥 Meniň kontaktlarym",
+        "btn_news":   "📣 Habarlar",
+        "btn_back":   "🔙 Hyzmatdaş menýusyndan çyk",
+        "learn_text": (
+            "📚 *Hyzmatdaş okuwы*\n\n"
+            "*Ädim 1 — Önümi öwren*\n"
+            "Ähli önümleri özüň synap gör. Diňe şahsy tejribe ynandyrýar.\n\n"
+            "*Ädim 2 — Ulgamy öwren*\n"
+            "BZP → Klub bonusy → KBB → BZK\n"
+            "Jikme-jik syn üçin «📊 Marketing» basyň.\n\n"
+            "*Ädim 3 — Ilkinji ädimler*\n"
+            "• 20 tanşyň sanawyny düz\n"
+            "• Olaryň 5-ine önüm barada aýt\n"
+            "• 2-sini topara çagyr (çep we sag şaha)\n\n"
+            "*Ädim 4 — Goldaw*\n"
+            "Müşderileri «👥 Meniň kontaktlarym»-a goş 🌿"
+        ),
+        "market_text": (
+            "📊 *Vertera marketingi*\n\n"
+            "Ilkinji günlerden 4 bonusyňyz bar:\n\n"
+            "1️⃣ *BZP* — hyzmatdaşyň satyn alşyndan 40%\n"
+            "2️⃣ *Klub bonusy* — birinji liniýanyň göwrümi üçin 55 ýa-da 110 UE\n"
+            "3️⃣ *KBB* — şahalarda 40+40 PV her sikl üçin\n"
+            "4️⃣ *BZK* — täze statusa ýetmek üçin bir gezek töleg\n\n"
+            "1 UE = 15 manat (TKM) / 10 000 sum (UZB)\n\n"
+            "Bota sorag ber — islendik bonusy düşündirer 🌿"
+        ),
+        "calc_ask":   "🧮 Toparyňyzdaky işjeň hyzmatdaşlaryň sanyny giriziň:",
+        "contacts_empty": "👥 Heniz kontaktyňyz ýok. Birinjisini goşuň!",
+        "contacts_add":   "➕ Kontakt goş",
+        "contacts_ask_name": "👤 Kontaktyň adyny giriziň:",
+        "contacts_ask_phone": "📞 Kontaktyň telefonyny giriziň:",
+        "contacts_saved": "✅ Kontakt goşuldy!",
+        "news_text":  "📣 Häzirlik habar ýok. Täzelenmeleri yzarlaň 🌿",
+    },
+    "uz": {
+        "btn":        "🤝 Men hamkorman",
+        "ask_id":     "🤝 Vertera shaxsiy kabinetingizdagi ID-ni kiriting:",
+        "wait":       "✅ So'rov yuborildi! Administrator tasdiqlashini kuting.",
+        "approved":   "🎉 Siz Vertera hamkori sifatida tasdiqlandi! Jamoaga xush kelibsiz 🌿",
+        "rejected":   "❌ So'rovingiz rad etildi. Menejer bilan bog'laning: @tach_ttt",
+        "menu_title": "🤝 Hamkorlik menyusi",
+        "btn_learn":  "📚 O'qitish",
+        "btn_market": "📊 Marketing",
+        "btn_calc":   "🧮 Daromad kalkulyatori",
+        "btn_contacts":"👥 Mening kontaktlarim",
+        "btn_news":   "📣 Yangiliklar",
+        "btn_back":   "🔙 Hamkorlik menyusidan chiqish",
+        "learn_text": (
+            "📚 *Hamkor o'qitish*\n\n"
+            "*Qadam 1 — Mahsulotni o'rgan*\n"
+            "Barcha mahsulotlarni o'zing sinab ko'r. Faqat shaxsiy tajriba ishontiradi.\n\n"
+            "*Qadam 2 — Tizimni o'rgan*\n"
+            "BZP → Klub bonusi → KBB → BZK\n"
+            "Batafsil uchun «📊 Marketing» tugmasini bosing.\n\n"
+            "*Qadam 3 — Birinchi qadamlar*\n"
+            "• 20 tanishingizdan ro'yxat tuzing\n"
+            "• Ulardan 5 tasiga mahsulot haqida ayting\n"
+            "• 2 tasini jamoaga taklif qiling (chap va o'ng tarmoq)\n\n"
+            "*Qadam 4 — Qo'llab-quvvatlash*\n"
+            "Mijozlarni «👥 Mening kontaktlarim»ga qo'shing 🌿"
+        ),
+        "market_text": (
+            "📊 *Vertera marketingi*\n\n"
+            "Birinchi kunlardan 4 ta bonusingiz bor:\n\n"
+            "1️⃣ *BZP* — hamkorning xarididan 40%\n"
+            "2️⃣ *Klub bonusi* — birinchi liniya hajmi uchun 55 yoki 110 UE\n"
+            "3️⃣ *KBB* — tarmoqlarda 40+40 PV har sikl uchun\n"
+            "4️⃣ *BZK* — yangi statusga erishganda bir martalik to'lov\n\n"
+            "1 UE = 15 manat (TKM) / 10 000 so'm (UZB)\n\n"
+            "Botga savol ber — istalgan bonusni tushuntiradi 🌿"
+        ),
+        "calc_ask":   "🧮 Jamoangizdagi faol hamkorlar sonini kiriting:",
+        "contacts_empty": "👥 Hali kontaktingiz yo'q. Birinchisini qo'shing!",
+        "contacts_add":   "➕ Kontakt qo'shish",
+        "contacts_ask_name": "👤 Kontakt ismini kiriting:",
+        "contacts_ask_phone": "📞 Kontakt telefonini kiriting:",
+        "contacts_saved": "✅ Kontakt qo'shildi!",
+        "news_text":  "📣 Hozircha yangilik yo'q. Yangilanishlarni kuzating 🌿",
+    },
+}
+
+def get_partner_keyboard(lang: str):
+    pt = PARTNER_TEXTS[lang]
+    return ReplyKeyboardMarkup(
+        [
+            [pt["btn_learn"],   pt["btn_market"]],
+            [pt["btn_calc"],    pt["btn_contacts"]],
+            [pt["btn_news"]],
+            [pt["btn_back"]],
+        ],
+        resize_keyboard=True
+    )
+
 
 # ─── Тексты на разных языках ─────────────────────────────────
 TEXTS = {
@@ -402,10 +650,11 @@ def get_catalog_text(lang: str, country: str) -> str:
 
 def get_main_keyboard(lang: str):
     t = TEXTS[lang]
+    pt = PARTNER_TEXTS.get(lang, PARTNER_TEXTS["ru"])
     return ReplyKeyboardMarkup(
         [[t["buy"], t["business"]],
          [t["catalog"], t["contact"]],
-         [t["home"]]],
+         [t["home"], pt["btn"]]],
         resize_keyboard=True
     )
 
@@ -496,6 +745,8 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "tk": "📖 Katalogumuzy Mini App-da açyň:\n\n👉 https://t.me/Verteratkmbot/vertera_tkm\n\nOrada ähli önümler suratlar, beýanlar we bahalar bilen 🌿",
             "uz": "📖 Katalogimizni Mini App-da oching:\n\n👉 https://t.me/Verteratkmbot/vertera_tkm\n\nU yerda barcha mahsulotlar rasmlar, tavsiflar va narxlar bilan 🌿",
         }
+        db_set_catalog_viewed(user.id)
+        schedule_catalog_reminder(context, user.id, lang)
         await update.message.reply_text(
             mini_app_text.get(lang, mini_app_text["ru"]),
             reply_markup=get_main_keyboard(lang)
@@ -843,8 +1094,248 @@ async def anketa_interest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return CHAT
 
 # ─── main ─────────────────────────────────────────────────────
+
+# ─── Партнёрские хендлеры ────────────────────────────────────
+
+async def partner_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Нажали кнопку 'Я партнёр'."""
+    lang = context.user_data.get("lang", "ru")
+    user = update.effective_user
+    pt = PARTNER_TEXTS.get(lang, PARTNER_TEXTS["ru"])
+
+    # Если уже партнёр — сразу в меню
+    if is_partner(user.id):
+        await update.message.reply_text(
+            pt["menu_title"],
+            reply_markup=get_partner_keyboard(lang)
+        )
+        return PARTNER_MENU
+
+    # Иначе — просим ID
+    await update.message.reply_text(
+        pt["ask_id"],
+        reply_markup=ReplyKeyboardRemove()
+    )
+    return PARTNER_ID
+
+async def partner_receive_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Получили ID компании от пользователя."""
+    lang    = context.user_data.get("lang", "ru")
+    user    = update.effective_user
+    company_id = update.message.text.strip()
+    pt = PARTNER_TEXTS.get(lang, PARTNER_TEXTS["ru"])
+
+    # Сохраняем pending
+    uname = f"@{user.username}" if user.username else str(user.id)
+    pending_add(user.id, {
+        "name": user.full_name or uname,
+        "company_id": company_id,
+        "lang": lang,
+        "tg_username": uname,
+        "tg_id": user.id,
+    })
+
+    # Уведомляем менеджера с инлайн-кнопками текстом
+    try:
+        await context.bot.send_message(
+            chat_id=MANAGER_CHAT_ID,
+            text=(
+                f"🤝 Запрос на доступ партнёра\n\n"
+                f"👤 {user.full_name or uname}\n"
+                f"🆔 {uname}\n"
+                f"🏢 ID компании: {company_id}\n\n"
+                f"Чтобы одобрить: /approve_{user.id}\n"
+                f"Чтобы отклонить: /reject_{user.id}"
+            )
+        )
+    except Exception as e:
+        logger.error(f"partner notify: {e}")
+
+    await update.message.reply_text(
+        pt["wait"],
+        reply_markup=get_main_keyboard(lang)
+    )
+    return CHAT
+
+async def partner_approve_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/approve_<user_id> — менеджер одобряет партнёра."""
+    text = update.message.text.strip()
+    if str(update.effective_user.id) != str(MANAGER_CHAT_ID):
+        return
+    try:
+        target_id = int(text.split("_")[1])
+    except (IndexError, ValueError):
+        return
+    info = pending_get(target_id)
+    if not info:
+        await update.message.reply_text("Запрос не найден.")
+        return
+    partner_add(target_id, info.get("name",""), info.get("company_id",""), info.get("lang","ru"))
+    pending_remove(target_id)
+    lang = info.get("lang", "ru")
+    pt = PARTNER_TEXTS.get(lang, PARTNER_TEXTS["ru"])
+    try:
+        await context.bot.send_message(
+            chat_id=target_id,
+            text=pt["approved"],
+            reply_markup=get_partner_keyboard(lang)
+        )
+    except Exception as e:
+        logger.error(f"approve send: {e}")
+    await update.message.reply_text(f"✅ Партнёр {info.get('name')} одобрен!")
+
+async def partner_reject_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/reject_<user_id> — менеджер отклоняет запрос."""
+    text = update.message.text.strip()
+    if str(update.effective_user.id) != str(MANAGER_CHAT_ID):
+        return
+    try:
+        target_id = int(text.split("_")[1])
+    except (IndexError, ValueError):
+        return
+    info = pending_get(target_id)
+    if not info:
+        await update.message.reply_text("Запрос не найден.")
+        return
+    pending_remove(target_id)
+    lang = info.get("lang", "ru")
+    pt = PARTNER_TEXTS.get(lang, PARTNER_TEXTS["ru"])
+    try:
+        await context.bot.send_message(chat_id=target_id, text=pt["rejected"])
+    except Exception as e:
+        logger.error(f"reject send: {e}")
+    await update.message.reply_text(f"❌ Запрос от {info.get('name')} отклонён.")
+
+async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик кнопок партнёрского меню."""
+    lang = context.user_data.get("lang", "ru")
+    country = context.user_data.get("country", "TKM")
+    text = update.message.text
+    pt = PARTNER_TEXTS.get(lang, PARTNER_TEXTS["ru"])
+
+    # Выход из партнёрского меню
+    if text == pt["btn_back"]:
+        await update.message.reply_text(
+            TEXTS[lang]["welcome"],
+            parse_mode="Markdown",
+            reply_markup=get_main_keyboard(lang)
+        )
+        return CHAT
+
+    # Обучение
+    if text == pt["btn_learn"]:
+        await update.message.reply_text(
+            pt["learn_text"],
+            parse_mode="Markdown",
+            reply_markup=get_partner_keyboard(lang)
+        )
+        return PARTNER_MENU
+
+    # Маркетинг
+    if text == pt["btn_market"]:
+        await update.message.reply_text(
+            pt["market_text"],
+            parse_mode="Markdown",
+            reply_markup=get_partner_keyboard(lang)
+        )
+        return PARTNER_MENU
+
+    # Калькулятор дохода
+    if text == pt["btn_calc"]:
+        context.user_data["awaiting_calc"] = True
+        await update.message.reply_text(
+            pt["calc_ask"],
+            reply_markup=ReplyKeyboardRemove()
+        )
+        return PARTNER_MENU
+
+    if context.user_data.get("awaiting_calc"):
+        context.user_data.pop("awaiting_calc", None)
+        try:
+            n = int(text.strip())
+            ue_per = 40
+            total_ue = n * ue_per
+            manat = total_ue * 15
+            sum_uz = total_ue * 10000
+            result = (
+                f"🧮 *Расчёт дохода*\n\n"
+                f"Активных партнёров: {n}\n"
+                f"Ориентировочный БЗП: ~{total_ue} UE/мес\n"
+                f"• TKM: ~{manat:,} манат\n"
+                f"• UZB: ~{sum_uz:,} сум\n\n"
+                f"_Это только БЗП. С бинаром и клубным бонусом доход выше_ 🌿"
+            )
+            await update.message.reply_text(
+                result, parse_mode="Markdown",
+                reply_markup=get_partner_keyboard(lang)
+            )
+        except ValueError:
+            await update.message.reply_text(
+                "Введите число, например: 10",
+                reply_markup=get_partner_keyboard(lang)
+            )
+        return PARTNER_MENU
+
+    # Контакты
+    if text == pt["btn_contacts"]:
+        user = update.effective_user
+        contacts = contacts_load(user.id)
+        if not contacts:
+            msg = pt["contacts_empty"]
+        else:
+            lines = [f"👤 {c['name']} | 📞 {c['phone']} | {c['status']}" for c in contacts]
+            msg = "👥 *Ваши контакты:*\n\n" + "\n".join(lines)
+        kb = ReplyKeyboardMarkup(
+            [[pt["contacts_add"]], [pt["btn_back"]]],
+            resize_keyboard=True
+        )
+        await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=kb)
+        return PARTNER_MENU
+
+    if text == pt["contacts_add"]:
+        await update.message.reply_text(
+            pt["contacts_ask_name"],
+            reply_markup=ReplyKeyboardRemove()
+        )
+        return PARTNER_CONTACTS_NAME
+
+    # Новости
+    if text == pt["btn_news"]:
+        await update.message.reply_text(
+            pt["news_text"],
+            reply_markup=get_partner_keyboard(lang)
+        )
+        return PARTNER_MENU
+
+    return PARTNER_MENU
+
+async def partner_contacts_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    lang = context.user_data.get("lang", "ru")
+    pt = PARTNER_TEXTS.get(lang, PARTNER_TEXTS["ru"])
+    context.user_data["new_contact_name"] = update.message.text.strip()
+    await update.message.reply_text(pt["contacts_ask_phone"], reply_markup=ReplyKeyboardRemove())
+    return PARTNER_CONTACTS_PHONE
+
+async def partner_contacts_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    lang    = context.user_data.get("lang", "ru")
+    user    = update.effective_user
+    pt      = PARTNER_TEXTS.get(lang, PARTNER_TEXTS["ru"])
+    name    = context.user_data.pop("new_contact_name", "—")
+    phone   = update.message.text.strip()
+    contact_add(user.id, name, phone)
+    await update.message.reply_text(
+        pt["contacts_saved"],
+        reply_markup=get_partner_keyboard(lang)
+    )
+    return PARTNER_MENU
+
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
+
+    # Паттерны кнопки "Я партнёр" на всех языках
+    partner_btn_filter = filters.Regex(
+        r"^(🤝 Я партнёр|🤝 Men hyzmatdaş|🤝 Men hamkorman)$"
+    )
 
     conv = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
@@ -852,7 +1343,20 @@ def main():
             SELECT_COUNTRY: [MessageHandler(filters.TEXT & ~filters.COMMAND, select_country)],
             SELECT_LANG: [MessageHandler(filters.TEXT & ~filters.COMMAND, select_lang)],
             CHAT: [
+                MessageHandler(partner_btn_filter, partner_entry),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, chat_with_gpt),
+            ],
+            PARTNER_ID: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, partner_receive_id),
+            ],
+            PARTNER_MENU: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, partner_menu_handler),
+            ],
+            PARTNER_CONTACTS_NAME: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, partner_contacts_name),
+            ],
+            PARTNER_CONTACTS_PHONE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, partner_contacts_phone),
             ],
             ANKETA_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, anketa_name)],
             ANKETA_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, anketa_phone)],
@@ -863,6 +1367,16 @@ def main():
         allow_reentry=True
     )
     app.add_handler(conv)
+
+    # Команды одобрения/отклонения от менеджера
+    app.add_handler(MessageHandler(
+        filters.Regex(r"^/approve_\d+$") & filters.TEXT,
+        partner_approve_cmd
+    ))
+    app.add_handler(MessageHandler(
+        filters.Regex(r"^/reject_\d+$") & filters.TEXT,
+        partner_reject_cmd
+    ))
     logger.info("🤖 Vertera bot started!")
     app.run_polling(drop_pending_updates=True)
 
