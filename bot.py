@@ -1,8 +1,6 @@
 import os
 import logging
 import httpx
-import shelve
-from datetime import datetime
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
@@ -30,101 +28,6 @@ SELECT_COUNTRY, SELECT_LANG, CHAT, ANKETA_NAME, ANKETA_PHONE, ANKETA_CITY, ANKET
 
 user_histories = {}
 
-# ─── База данных (shelve) ─────────────────────────────────────
-DB_PATH = "/tmp/vertera_users"
-
-def db_save_user(user_id: int, country: str, lang: str):
-    try:
-        with shelve.open(DB_PATH) as db:
-            db[str(user_id)] = {"country": country, "lang": lang}
-    except Exception as e:
-        logger.error(f"DB save: {e}")
-
-def db_load_user(user_id: int):
-    try:
-        with shelve.open(DB_PATH) as db:
-            return db.get(str(user_id))
-    except Exception as e:
-        logger.error(f"DB load: {e}")
-        return None
-
-def db_set_anketa_started(user_id: int):
-    try:
-        with shelve.open(DB_PATH) as db:
-            db[f"anketa_{user_id}"] = {"started_at": datetime.utcnow().isoformat(), "done": False}
-    except Exception as e:
-        logger.error(f"DB anketa start: {e}")
-
-def db_set_anketa_done(user_id: int):
-    try:
-        with shelve.open(DB_PATH) as db:
-            db[f"anketa_{user_id}"] = {"done": True}
-    except Exception as e:
-        logger.error(f"DB anketa done: {e}")
-
-def db_anketa_needs_reminder(user_id: int) -> bool:
-    try:
-        with shelve.open(DB_PATH) as db:
-            data = db.get(f"anketa_{user_id}")
-            return bool(data and not data.get("done"))
-    except Exception as e:
-        logger.error(f"DB reminder check: {e}")
-        return False
-
-REMINDER_TEXTS = {
-    "ru": (
-        "👋 Привет! Вы начали заполнять анкету, но не завершили.\n\n"
-        "Это займёт всего 1 минуту 📝\n\n"
-        "Нажмите *«✅ Да, заполнить анкету»* чтобы продолжить."
-    ),
-    "tk": (
-        "👋 Salam! Siz anketa doldurmaga başladyňyz, ýöne tamamlamadyňyz.\n\n"
-        "Bu diňe 1 minut alar 📝\n\n"
-        "*«✅ Hawa, anketa doldurmak»* düwmesine basyň."
-    ),
-    "uz": (
-        "👋 Salom! Siz anketa to\'ldirishni boshladingiz, lekin tugatmadingiz.\n\n"
-        "Bu atigi 1 daqiqa oladi 📝\n\n"
-        "*«✅ Ha, anketa to\'ldirish»* tugmasini bosing."
-    ),
-}
-
-async def send_anketa_reminder(context) -> None:
-    job = context.job
-    user_id = job.data["user_id"]
-    lang = job.data.get("lang", "ru")
-    if not db_anketa_needs_reminder(user_id):
-        return
-    reminder_text = REMINDER_TEXTS.get(lang, REMINDER_TEXTS["ru"])
-    lang_data = TEXTS.get(lang, TEXTS["ru"])
-    keyboard = ReplyKeyboardMarkup(
-        [[lang_data["anketa_yes"]], [lang_data["anketa_no"]]],
-        resize_keyboard=True
-    )
-    try:
-        await context.bot.send_message(
-            chat_id=user_id,
-            text=reminder_text,
-            parse_mode="Markdown",
-            reply_markup=keyboard
-        )
-        logger.info(f"Reminder sent to {user_id}")
-    except Exception as e:
-        logger.error(f"Reminder error {user_id}: {e}")
-
-async def notify_manager(bot, user, country, lang, event: str):
-    country_label = "Туркменистан 🇹🇲" if country == "TKM" else "Узбекистан 🇺🇿"
-    uname = f"@{user.username}" if user.username else str(user.id)
-    name_str = user.full_name or uname
-    try:
-        await bot.send_message(
-            chat_id="@tach_ttt",
-            text=f"{event}\n\n🌍 {country_label}\n🗣 {lang}\n👤 {name_str}\n🆔 {uname}"
-        )
-    except Exception as e:
-        logger.error(f"notify_manager error: {e}")
-
-
 # ─── Тексты на разных языках ─────────────────────────────────
 TEXTS = {
     "ru": {
@@ -134,6 +37,7 @@ TEXTS = {
         "catalog": "📖 Каталог",
         "contact": "📞 Связаться",
         "home": "🔙 Главная",
+        "change_lang": "🌐 Сменить страну / язык",
         "register_btn": "📋 Инструкция по регистрации",
         "catalog_text": "📖 Наш каталог продукции Vertera:\n{catalog_link}\n\nЕсть вопросы по продуктам? Спрашивай!",
         "contact_text": "📞 Свяжитесь с нашим менеджером:\n\nTelegram: {sponsor}\nТелефон: {phone}\n\nОтвечаем быстро! 🌿",
@@ -157,6 +61,7 @@ TEXTS = {
         "catalog": "📖 Katalog",
         "contact": "📞 Habarlaşmak",
         "home": "🔙 Baş sahypa",
+        "change_lang": "🌐 Ýurt / dil çalyşmak",
         "register_btn": "📋 Hasaba alyş görkezmeleri",
         "catalog_text": "📖 Vertera önümlerimiziň katalogy:\n{catalog_link}\n\nÖnümler barada soraglaryňyz barmy? Soraň!",
         "contact_text": "📞 Menejerimiz bilen habarlaşyň:\n\nTelegram: {sponsor}\nTelefon: {phone}\n\nTiz jogap berýäris! 🌿",
@@ -180,6 +85,7 @@ TEXTS = {
         "catalog": "📖 Katalog",
         "contact": "📞 Bog'lanish",
         "home": "🔙 Bosh sahifa",
+        "change_lang": "🌐 Mamlakat / til o'zgartirish",
         "register_btn": "📋 Ro'yxatdan o'tish",
         "catalog_text": "📖 Vertera mahsulotlari katalogi:\n{catalog_link}\n\nMahsulotlar haqida savollaringiz bormi? So'rang!",
         "contact_text": "📞 Menejerimiz bilan bog'laning:\n\nTelegram: {sponsor}\nTelefon: {phone}\n\nTez javob beramiz! 🌿",
@@ -501,7 +407,7 @@ def get_main_keyboard(lang: str):
     return ReplyKeyboardMarkup(
         [[t["buy"], t["business"]],
          [t["catalog"], t["contact"]],
-         [t["home"]]],
+         [t["change_lang"]]],
         resize_keyboard=True
     )
 
@@ -510,24 +416,6 @@ def get_phone(country: str) -> str:
 
 # ─── /start — выбор страны ───────────────────────────────────
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    saved = db_load_user(user.id)
-    if saved:
-        context.user_data["country"] = saved["country"]
-        context.user_data["lang"]    = saved["lang"]
-        lang    = saved["lang"]
-        country = saved["country"]
-        t_      = TEXTS[lang]
-        user_histories[user.id] = []
-        flag  = "🇹🇲" if country == "TKM" else "🇺🇿"
-        cname = ("Türkmenistan" if lang == "tk" else "Туркменистан") if country == "TKM" \
-                else ("O'zbekiston" if lang == "uz" else "Узбекистан")
-        await update.message.reply_text(
-            f"👋 {flag} {cname}\n\n" + t_["welcome"],
-            parse_mode="Markdown",
-            reply_markup=get_main_keyboard(lang)
-        )
-        return CHAT
     context.user_data.clear()
     await update.message.reply_text(
         "🌍 Выберите вашу страну / Choose your country:\n\nТуркменистан 🇹🇲 / O'zbekiston 🇺🇿",
@@ -576,7 +464,6 @@ async def select_lang(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["lang"] = lang
     user = update.effective_user
     user_histories[user.id] = []
-    db_save_user(user.id, country, lang)
 
     t = TEXTS[lang]
     await update.message.reply_text(
@@ -595,6 +482,19 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     phone = get_phone(country)
     t = TEXTS[lang]
 
+    # Кнопка смены страны/языка
+    if text in [t.get("change_lang",""), "🌐 Сменить страну / язык", "🌐 Ýurt / dil çalyşmak", "🌐 Mamlakat / til o'zgartirish"]:
+        context.user_data.clear()
+        user_histories.pop(user.id, None)
+        await update.message.reply_text(
+            "🌍 Выберите вашу страну / Choose your country:\n\nТуркменистан 🇹🇲 / O'zbekiston 🇺🇿",
+            reply_markup=ReplyKeyboardMarkup(
+                [["🇹🇲 Туркменистан", "🇺🇿 Узбекистан / O'zbekiston"]],
+                resize_keyboard=True, one_time_keyboard=True
+            )
+        )
+        return SELECT_COUNTRY
+
     # Кнопка главная
     if text in [t["home"], "🔙 Главная", "🔙 Baş sahypa", "🔙 Bosh sahifa"]:
         await update.message.reply_text(
@@ -604,15 +504,12 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return CHAT
 
-    # Кнопка каталога — направляем в Mini App
+    # Кнопка каталога
     if text in [t["catalog"], "📖 Каталог", "📖 Katalog"]:
-        mini_app_texts = {
-            "ru": "📖 Откройте наш каталог в Mini App:\n\n👉 https://t.me/Verteratkmbot/vertera_tkm\n\nТам все продукты с фото, описаниями и ценами 🌿",
-            "tk": "📖 Katalogumuzy Mini App-da açyň:\n\n👉 https://t.me/Verteratkmbot/vertera_tkm\n\nOrada ähli önümler suratlar, beýanlar we bahalar bilen 🌿",
-            "uz": "📖 Katalogimizni Mini App-da oching:\n\n👉 https://t.me/Verteratkmbot/vertera_tkm\n\nU yerda barcha mahsulotlar rasmlar, tavsiflar va narxlar bilan 🌿",
-        }
+        catalog_text = get_catalog_text(lang, country)
         await update.message.reply_text(
-            mini_app_texts.get(lang, mini_app_texts["ru"]),
+            catalog_text,
+            parse_mode="Markdown",
             reply_markup=get_main_keyboard(lang)
         )
         return CHAT
@@ -627,19 +524,38 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Кнопка купить продукт
     if text in [t["buy"], "🛒 Купить продукт", "🛒 Önüm satyn almak", "🛒 Mahsulot sotib olish"]:
-        await notify_manager(context.bot, user, country, lang, "🛒 Интерес к покупке")
+        try:
+            country_label = "Туркменистан 🇹🇲" if country == "TKM" else "Узбекистан 🇺🇿"
+            uname = f"@{user.username}" if user.username else str(user.id)
+            await context.bot.send_message(
+                chat_id="@tach_ttt",
+                text=f"🛒 Интерес к покупке\n🌍 {country_label} | 🗣 {lang}\n👤 {user.full_name or uname} | 🆔 {uname}"
+            )
+        except Exception as e:
+            logger.error(f"Buy notify: {e}")
         buy_menu = ReplyKeyboardMarkup(
             [[t["anketa_yes"]], [t["register_btn"]], [t["home"]]],
             resize_keyboard=True
         )
-        footer = {
-            "ru": "\n\n🛒 Чтобы сделать заказ — заполните анкету, наш менеджер поможет с выбором 🌿",
-            "tk": "\n\n🛒 Sargyt etmek üçin — anketa dolduryň, menejerimiz siz bilen habarlaşar 🌿",
-            "uz": "\n\n🛒 Buyurtma berish uchun — anketa to\'ldiring, menejerimiz siz bilan bog\'lanadi 🌿",
+        buy_text = {
+            "ru": (
+                "🛒 *Купить продукт Vertera*\n\n"
+                "Все продукты Vertera можно приобрести со скидкой 30% после регистрации личного кабинета.\n\n"
+                "Чтобы сделать заказ — заполните анкету, наш менеджер свяжется с вами и поможет с выбором 🌿"
+            ),
+            "tk": (
+                "🛒 *Vertera önümini satyn almak*\n\n"
+                "Ähli Vertera önümlerini şahsy kabineti hasaba aldyranyňyzdan soň 30% arzanladyş bilen satyn alyp bilersiňiz.\n\n"
+                "Sargyt etmek üçin — anketa dolduryň, menejerimiz siz bilen habarlaşar 🌿"
+            ),
+            "uz": (
+                "🛒 *Vertera mahsulotini sotib olish*\n\n"
+                "Barcha Vertera mahsulotlarini shaxsiy kabinetni ro\'yxatdan o\'tkazganingizdan so\'ng 30% chegirma bilan sotib olish mumkin.\n\n"
+                "Buyurtma berish uchun — anketa to\'ldiring, menejerimiz siz bilan bog\'lanadi 🌿"
+            ),
         }
-        catalog_with_footer = get_catalog_text(lang, country) + footer.get(lang, footer["ru"])
         await update.message.reply_text(
-            catalog_with_footer,
+            buy_text.get(lang, buy_text["ru"]),
             parse_mode="Markdown",
             reply_markup=buy_menu
         )
@@ -647,7 +563,15 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Кнопка бизнес
     if text in [t["business"], "💼 Бизнес с Vertera", "💼 Vertera bilen iş", "💼 Vertera bilan biznes"]:
-        await notify_manager(context.bot, user, country, lang, "💼 Интерес к бизнесу")
+        try:
+            country_label = "Туркменистан 🇹🇲" if country == "TKM" else "Узбекистан 🇺🇿"
+            uname = f"@{user.username}" if user.username else str(user.id)
+            await context.bot.send_message(
+                chat_id="@tach_ttt",
+                text=f"💼 Интерес к бизнесу\n🌍 {country_label} | 🗣 {lang}\n👤 {user.full_name or uname} | 🆔 {uname}"
+            )
+        except Exception as e:
+            logger.error(f"Biz notify: {e}")
         business_menu = ReplyKeyboardMarkup(
             [
                 [t["anketa_yes"]],
@@ -779,31 +703,10 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ─── Анкета ──────────────────────────────────────────────────
 async def start_anketa(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lang = context.user_data.get("lang", "ru")
-    country = context.user_data.get("country", "TKM")
     t = TEXTS[lang]
-    user = update.effective_user
-    no_variants = [
-        t.get("anketa_no", ""),
-        "❌ Нет, продолжить общение",
-        "❌ Ýok, gürrüňdeşligi dowam etmek",
-        "❌ Yo'q, suhbatni davom ettirish",
-    ]
-    if update.message.text in no_variants:
+    if update.message.text == t["anketa_no"]:
         await update.message.reply_text(t["anketa_ok"], reply_markup=get_main_keyboard(lang))
         return CHAT
-    # Фиксируем начало + ставим напоминание через 24ч
-    db_set_anketa_started(user.id)
-    job_name = f"reminder_{user.id}"
-    for job in context.job_queue.get_jobs_by_name(job_name):
-        job.schedule_removal()
-    context.job_queue.run_once(
-        send_anketa_reminder,
-        when=86400,
-        data={"user_id": user.id, "lang": lang, "country": country},
-        name=job_name,
-        chat_id=user.id,
-        user_id=user.id,
-    )
     await update.message.reply_text(t["anketa_start"], reply_markup=ReplyKeyboardRemove())
     return ANKETA_NAME
 
@@ -837,11 +740,6 @@ async def anketa_interest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     t = TEXTS[lang]
 
     context.user_data["interest"] = update.message.text
-
-    # Анкета завершена — отменяем напоминание
-    db_set_anketa_done(user.id)
-    for job in context.job_queue.get_jobs_by_name(f"reminder_{user.id}"):
-        job.schedule_removal()
 
     name = context.user_data.get("name", "—")
     user_phone = context.user_data.get("phone_user", "—")
