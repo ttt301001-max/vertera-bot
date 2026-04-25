@@ -676,7 +676,7 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "4️⃣ *БЗК — Бонус за квалификацию*\n"
                 "Единовременная выплата при достижении нового статуса. "
                 "Растёшь — получаешь награду за каждый новый уровень.\n\n"
-                "Готов начать? Заполни анкету — менеджер объяснит всё лично 🌿"
+                "Хотите узнать больше — нажмите кнопку *«📞 Связаться»* 🌿"
             ),
             "tk": (
                 "📊 *Siz nähili gazanarsyňyz?*\n\n"
@@ -695,7 +695,7 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "4️⃣ *BZK — Derejä ýetmek bonusy*\n"
                 "Täze statusa ýetileninde bir gezek töleg. "
                 "Gurluşda ösýärsiň — her täze dereje üçin sylag.\n\n"
-                "Başlamaga taýynmy? Anketa dolduryň 🌿"
+                "Köpräk bilmek isleýärsiňizmi — *«📞 Habarlaşmak»* düwmesine basyň 🌿"
             ),
             "uz": (
                 "📊 *Siz qanday daromad olasiz?*\n\n"
@@ -714,14 +714,14 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "4️⃣ *BZK — Malaka bonusi*\n"
                 "Yangi statusga erishilganda bir martalik to'lov. "
                 "O'sasan — har yangi daraja uchun mukofot.\n\n"
-                "Boshlashga tayyormisiz? Anketa to'ldiring 🌿"
+                "Ko'proq bilmoqchimisiz — *«📞 Bog'lanish»* tugmasini bosing 🌿"
             ),
         }
         await update.message.reply_text(
             detail.get(lang, detail["ru"]),
             parse_mode="Markdown",
             reply_markup=ReplyKeyboardMarkup(
-                [[t["anketa_yes"]], [t["home"]]],
+                [[t["anketa_yes"]], [t["register_btn"]], [t["contact"]], [t["home"]]],
                 resize_keyboard=True
             )
         )
