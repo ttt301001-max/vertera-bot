@@ -115,7 +115,7 @@ REG_INSTRUCTIONS = {
             "6️⃣ Подождите *10 секунд* — появится кнопка, нажмите на неё\n\n"
             "7️⃣ Вы получите свой личный *ID-номер* 🎉\n\n"
             "8️⃣ Нажмите *«На главную»* — вы попадёте на страницу входа в личный кабинет\n\n"
-            "Если возникнут трудности — напишите нам: {SPONSOR_USERNAME}"
+            "Если возникнут трудности — напишите нам: {sponsor}"
         ),
         "tk": (
             "📋 *Hasaba alyş görkezmeleri (Türkmenistan):*\n\n"
@@ -127,7 +127,7 @@ REG_INSTRUCTIONS = {
             "6️⃣ *10 sekunt* garaşyň — düwme peýda bolar, basyň\n\n"
             "7️⃣ Şahsy *ID belgiňizi* alarsyňyz 🎉\n\n"
             "8️⃣ *«Baş sahypa»* düwmesine basyň — şahsy otaga giriş sahypasyna geçersiňiz\n\n"
-            "Kynçylyk çeksеňiz — bize ýazyň: {SPONSOR_USERNAME}"
+            "Kynçylyk çeksеňiz — bize ýazyň: {sponsor}"
         ),
     },
     "UZB": {
@@ -140,7 +140,7 @@ REG_INSTRUCTIONS = {
             "5️⃣ Введите код из SMS\n\n"
             "6️⃣ Вы получите свой личный *ID-номер* 🎉\n\n"
             "7️⃣ Войдите в личный кабинет по номеру телефона\n\n"
-            "Если возникнут трудности — напишите нам: {SPONSOR_USERNAME}"
+            "Если возникнут трудности — напишите нам: {sponsor}"
         ),
         "uz": (
             "📋 *Ro'yxatdan o'tish ko'rsatmalari (O'zbekiston):*\n\n"
@@ -151,7 +151,7 @@ REG_INSTRUCTIONS = {
             "5️⃣ SMS-dan kodni kiriting\n\n"
             "6️⃣ Shaxsiy *ID-raqamingizni* olasiz 🎉\n\n"
             "7️⃣ Telefon raqami orqali shaxsiy kabinetga kiring\n\n"
-            "Qiyinchilik bo'lsa — bizga yozing: {SPONSOR_USERNAME}"
+            "Qiyinchilik bo'lsa — bizga yozing: {sponsor}"
         ),
     }
 }
