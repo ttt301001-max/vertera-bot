@@ -14,7 +14,6 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 GOOGLE_SHEET_URL = os.getenv("GOOGLE_SHEET_URL", "https://script.google.com/macros/s/AKfycbzqwkgp8nSXxtSN1VB16QObhcOgqY4ye45-_Xmpc9OgAQnhQLAdL3EcjcSSg8zz05c/exec")
 
 SPONSOR_USERNAME = "@tach_ttt"
-# ↓ Вставь числовой ID аккаунта @tach_ttt (узнать через @userinfobot)
 MANAGER_CHAT_ID = 699255285  # @tach_ttt
 SPONSOR_PHONE_TKM = "+99363327177"
 SPONSOR_PHONE_UZB = "+99363327177"
@@ -116,7 +115,7 @@ REG_INSTRUCTIONS = {
             "6️⃣ Подождите *10 секунд* — появится кнопка, нажмите на неё\n\n"
             "7️⃣ Вы получите свой личный *ID-номер* 🎉\n\n"
             "8️⃣ Нажмите *«На главную»* — вы попадёте на страницу входа в личный кабинет\n\n"
-            ""
+            "Если возникнут трудности — напишите нам: {sponsor}"
         ),
         "tk": (
             "📋 *Hasaba alyş görkezmeleri (Türkmenistan):*\n\n"
@@ -128,7 +127,7 @@ REG_INSTRUCTIONS = {
             "6️⃣ *10 sekunt* garaşyň — düwme peýda bolar, basyň\n\n"
             "7️⃣ Şahsy *ID belgiňizi* alarsyňyz 🎉\n\n"
             "8️⃣ *«Baş sahypa»* düwmesine basyň — şahsy otaga giriş sahypasyna geçersiňiz\n\n"
-            ""
+            "Kynçylyk çeksеňiz — bize ýazyň: {sponsor}"
         ),
     },
     "UZB": {
@@ -141,7 +140,7 @@ REG_INSTRUCTIONS = {
             "5️⃣ Введите код из SMS\n\n"
             "6️⃣ Вы получите свой личный *ID-номер* 🎉\n\n"
             "7️⃣ Войдите в личный кабинет по номеру телефона\n\n"
-            ""
+            "Если возникнут трудности — напишите нам: {sponsor}"
         ),
         "uz": (
             "📋 *Ro'yxatdan o'tish ko'rsatmalari (O'zbekiston):*\n\n"
@@ -152,7 +151,7 @@ REG_INSTRUCTIONS = {
             "5️⃣ SMS-dan kodni kiriting\n\n"
             "6️⃣ Shaxsiy *ID-raqamingizni* olasiz 🎉\n\n"
             "7️⃣ Telefon raqami orqali shaxsiy kabinetga kiring\n\n"
-            ""
+            "Qiyinchilik bo'lsa — bizga yozing: {sponsor}"
         ),
     }
 }
@@ -447,287 +446,6 @@ async def select_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     return SELECT_LANG
 
-
-# ─── Onboarding цепочка ──────────────────────────────────────
-
-ONBOARDING_MSG = {
-    # День 0 — сразу после выбора языка
-    "day0": {
-        "ru": (
-            "🌊 *Знакомьтесь — Vertera!*\n\n"
-            "В основе всех наших продуктов — *ламинария* и *фукус*: "
-            "бурые морские водоросли из экологически чистых морей.\n\n"
-            "Они содержат более *140 биологически активных веществ*: "
-            "йод, витамины, аминокислоты, полисахариды и антиоксиданты — "
-            "всё в той форме, которую организм усваивает максимально.\n\n"
-            "Vertera основана в 2014 году. Сегодня продукция компании "
-            "представлена в 15+ странах мира. Все продукты прошли "
-            "клинические исследования и сертифицированы 🌿"
-        ),
-        "tk": (
-            "🌊 *Tanyşyň — Vertera!*\n\n"
-            "Ähli önümlerimiziň esasyny *laminariýa* we *fukus* düzýär: "
-            "ekologik taýdan arassa deňizlerden alynýan goňur suw ösümlikleri.\n\n"
-            "Olar 140-dan gowrak biologiki işjeň madda öz içine alýar: "
-            "ýod, witaminler, aminokislotalar, polisakaridler we antioksidantlar — "
-            "bedeniň iň gowy özleşdirýän görnüşinde.\n\n"
-            "Vertera 2014-nji ýylda esaslandyryldy. Häzir önümler "
-            "dünýäniň 15+ ýurdunda bar. Ähli önümler kliniki synagdan geçdi 🌿"
-        ),
-        "uz": (
-            "🌊 *Tanishing — Vertera!*\n\n"
-            "Barcha mahsulotlarimizning asosini *laminaria* va *fukus* tashkil etadi: "
-            "ekologik toza dengizlardan olinadigan jigarrang suv o'tlari.\n\n"
-            "Ular 140 dan ortiq biologik faol modda o'z ichiga oladi: "
-            "yod, vitaminlar, aminokislotalar, polisakaridlar va antioksidantlar — "
-            "organizm eng yaxshi o'zlashtiradigan shaklda.\n\n"
-            "Vertera 2014 yilda tashkil etilgan. Bugun mahsulotlar "
-            "15+ mamlakatda mavjud. Barcha mahsulotlar klinik sinovdan o'tgan 🌿"
-        ),
-    },
-
-    # Через 10 минут — каталог
-    "day0_10min": {
-        "ru": "🛍 *Вот что есть в нашем каталоге:*\n\n{catalog}",
-        "tk": "🛍 *Biziň katalogymyzda bar bolan önümler:*\n\n{catalog}",
-        "uz": "🛍 *Bizning katalogimizda mavjud mahsulotlar:*\n\n{catalog}",
-    },
-
-    # Через 1 час — технология PLASMA
-    "day0_1h": {
-        "ru": (
-            "🔬 *Технология PLASMA — в чём секрет?*\n\n"
-            "Все продукты Vertera созданы с применением запатентованной "
-            "технологии *PLASMA* — это гидролизат бурых морских водорослей.\n\n"
-            "Благодаря ей активные вещества водорослей переходят в "
-            "наночастицы — они проникают в клетки напрямую, минуя "
-            "пищеварительные барьеры.\n\n"
-            "Результат: биодоступность в *3–5 раз выше*, чем у обычных "
-            "продуктов из водорослей.\n\n"
-            "Именно поэтому эффект ощущается быстро 💧"
-        ),
-        "tk": (
-            "🔬 *PLASMA tehnologiýasy — syr näme?*\n\n"
-            "Ähli Vertera önümleri patentlenen *PLASMA* tehnologiýasy "
-            "bilen döredildi — bu goňur suw ösümlikleriniň gidrolizaty.\n\n"
-            "Onuň kömegi bilen suw ösümlikleriniň işjeň maddalary "
-            "nanozarryjalara öwrülýär — olar iýmit siňdiriş päsgelçiliklerini "
-            "aşyp, öýjüklere göni aralaşýar.\n\n"
-            "Netije: Biodostuplugy adaty önümlerden *3–5 esse ýokary*.\n\n"
-            "Şonuň üçin täsir tiz duýulýar 💧"
-        ),
-        "uz": (
-            "🔬 *PLASMA texnologiyasi — sir nimada?*\n\n"
-            "Barcha Vertera mahsulotlari patentlangan *PLASMA* texnologiyasi "
-            "asosida yaratilgan — bu jigarrang suv o'tlarining gidrolizati.\n\n"
-            "Uning yordamida suv o'tlarining faol moddalari nanozarrachalarga "
-            "aylanadi — ular hazm to'siqlarini chetlab, to'g'ridan-to'g'ri "
-            "hujayralarga kiradi.\n\n"
-            "Natija: Biodostuplik oddiy mahsulotlardan *3–5 marta yuqori*.\n\n"
-            "Shuning uchun ta'sir tez seziladi 💧"
-        ),
-    },
-
-    # Через 1 день — прогрев на бизнес
-    "day1": {
-        "ru": (
-            "💼 *Vertera — это не просто продукт*\n\n"
-            "Тысячи людей в СНГ уже строят стабильный доход, "
-            "просто рекомендуя Vertera своим близким.\n\n"
-            "Как это работает:\n"
-            "• Попробовал сам → убедился в результате\n"
-            "• Рассказал другу → он купил со скидкой 30%\n"
-            "• Получил доход — и так по цепочке\n\n"
-            "Никаких офисов, складов или вложений.\n"
-            "Только рекомендации — и реальный результат 🌿\n\n"
-            "Хотите узнать подробнее? Нажмите кнопку *«💼 Бизнес с Vertera»*"
-        ),
-        "tk": (
-            "💼 *Vertera — bu diňe bir önüm däl*\n\n"
-            "MDB-de müňlerçe adam öz ýakynlaryna Vertera maslahat bermek "
-            "arkaly durnukly girdeji gazanýar.\n\n"
-            "Bu nähili işleýär:\n"
-            "• Özüň synap gör → netijä ynan\n"
-            "• Dostuna aýt → ol 30% arzanladyş bilen satyn aldy\n"
-            "• Girdeji al — şeýdip dowam edýär\n\n"
-            "Hiç ofis, ammar ýa-da maýa goýum ýok.\n"
-            "Diňe maslahatlar — we hakyky netije 🌿\n\n"
-            "Giňişleýin bilmek isleýärsiňizmi? *«💼 Vertera bilen iş»* düwmesine basyň"
-        ),
-        "uz": (
-            "💼 *Vertera — bu faqat mahsulot emas*\n\n"
-            "MDHda minglab odamlar Verterani yaqinlariga tavsiya qilish "
-            "orqali barqaror daromad topmoqda.\n\n"
-            "Bu qanday ishlaydi:\n"
-            "• O'zing sinab ko'r → natijaga ishon\n"
-            "• Do'stingga ayt → u 30% chegirma bilan sotib oldi\n"
-            "• Daromad ol — va shu zanjir davom etadi\n\n"
-            "Hech ofis, ombor yoki sarmoya yo'q.\n"
-            "Faqat tavsiyalar — va haqiqiy natija 🌿\n\n"
-            "Batafsil bilmoqchimisiz? *«💼 Vertera bilan biznes»* tugmasini bosing"
-        ),
-    },
-}
-
-async def onboarding_job(context) -> None:
-    """Отправляет одно сообщение из onboarding цепочки."""
-    job   = context.job
-    user_id  = job.data["user_id"]
-    lang     = job.data["lang"]
-    country  = job.data["country"]
-    msg_key  = job.data["msg_key"]
-
-    msg_data = ONBOARDING_MSG.get(msg_key, {})
-    text = msg_data.get(lang, msg_data.get("ru", ""))
-
-    # Для каталога подставляем список продуктов
-    if msg_key == "day0_10min":
-        catalog = get_catalog_text(lang, country)
-        text = text.format(catalog=catalog)
-
-    if not text:
-        return
-
-    lang_data = TEXTS.get(lang, TEXTS["ru"])
-    try:
-        await context.bot.send_message(
-            chat_id=user_id,
-            text=text,
-            parse_mode="Markdown",
-            reply_markup=ReplyKeyboardMarkup(
-                [[lang_data["buy"], lang_data["business"]],
-                 [lang_data["catalog"], lang_data["contact"]],
-                 [lang_data.get("change_lang", "🌐 Сменить страну / язык")]],
-                resize_keyboard=True
-            )
-        )
-    except Exception as e:
-        logger.error(f"Onboarding job error {user_id}/{msg_key}: {e}")
-
-def schedule_onboarding(context, user_id: int, lang: str, country: str):
-    """Планирует всю цепочку onboarding сообщений."""
-    base = f"onboard_{user_id}"
-
-    # Отменяем старые jobs если были
-    for key in ["day0_10min", "day0_1h", "day1"]:
-        for job in context.job_queue.get_jobs_by_name(f"{base}_{key}"):
-            job.schedule_removal()
-
-    data_base = {"user_id": user_id, "lang": lang, "country": country}
-
-    # Через 10 минут — каталог
-    context.job_queue.run_once(
-        onboarding_job, when=600,
-        data={**data_base, "msg_key": "day0_10min"},
-        name=f"{base}_day0_10min", chat_id=user_id, user_id=user_id,
-    )
-    # Через 1 час — технология
-    context.job_queue.run_once(
-        onboarding_job, when=3600,
-        data={**data_base, "msg_key": "day0_1h"},
-        name=f"{base}_day0_1h", chat_id=user_id, user_id=user_id,
-    )
-    # Через 1 день — бизнес
-    context.job_queue.run_once(
-        onboarding_job, when=86400,
-        data={**data_base, "msg_key": "day1"},
-        name=f"{base}_day1", chat_id=user_id, user_id=user_id,
-    )
-
-
-# ─── Напоминание после просмотра каталога/продуктов ──────────
-
-CATALOG_REMINDER_MSG = {
-    "ru": (
-        "👀 *Вы смотрели наши продукты!*\n\n"
-        "Если остались вопросы — я здесь 🌿\n\n"
-        "Хотите узнать какой продукт подойдёт именно вам? "
-        "Просто напишите мне или заполните анкету — "
-        "наш менеджер подберёт лучший вариант и расскажет про скидку 30% 👇"
-    ),
-    "tk": (
-        "👀 *Siz önümlerimize serediňiz!*\n\n"
-        "Soraglaryňyz galan bolsa — men şu ýerde 🌿\n\n"
-        "Haýsy önümiň size laýyk gelýändigini bilmek isleýärsiňizmi? "
-        "Maňa ýazyň ýa-da anketa dolduryň — "
-        "menejerimiz iň gowy görnüşi saýlar we 30% arzanladyş hakda aýdar 👇"
-    ),
-    "uz": (
-        "👀 *Siz mahsulotlarimizga qaradingiz!*\n\n"
-        "Savollar qolgan bo'lsa — men shu yerdaman 🌿\n\n"
-        "Qaysi mahsulot aynan sizga mos kelishini bilmoqchimisiz? "
-        "Menga yozing yoki anketa to'ldiring — "
-        "menejerimiz eng yaxshi variantni tanlaydi va 30% chegirma haqida aytadi 👇"
-    ),
-}
-
-def db_set_catalog_viewed(user_id: int):
-    """Фиксируем что пользователь смотрел каталог/продукты."""
-    try:
-        with shelve.open(DB_PATH) as db:
-            db[f"catalog_{user_id}"] = {"viewed": True, "acted": False}
-    except Exception as e:
-        logger.error(f"DB catalog_viewed error: {e}")
-
-def db_set_catalog_acted(user_id: int):
-    """Пользователь совершил действие — напоминание не нужно."""
-    try:
-        with shelve.open(DB_PATH) as db:
-            db[f"catalog_{user_id}"] = {"viewed": True, "acted": True}
-    except Exception as e:
-        logger.error(f"DB catalog_acted error: {e}")
-
-def db_catalog_needs_reminder(user_id: int) -> bool:
-    """True если смотрел каталог но не совершил действие."""
-    try:
-        with shelve.open(DB_PATH) as db:
-            data = db.get(f"catalog_{user_id}")
-            return bool(data and data.get("viewed") and not data.get("acted"))
-    except Exception as e:
-        logger.error(f"DB catalog_reminder check: {e}")
-        return False
-
-async def send_catalog_reminder(context) -> None:
-    """Job: напоминание через 2 часа после просмотра каталога без действий."""
-    job = context.job
-    user_id = job.data["user_id"]
-    lang    = job.data["lang"]
-
-    if not db_catalog_needs_reminder(user_id):
-        return
-
-    text = CATALOG_REMINDER_MSG.get(lang, CATALOG_REMINDER_MSG["ru"])
-    lang_data = TEXTS.get(lang, TEXTS["ru"])
-    keyboard = ReplyKeyboardMarkup(
-        [[lang_data["anketa_yes"]], [lang_data["buy"]], [lang_data.get("change_lang", "")]],
-        resize_keyboard=True
-    )
-    try:
-        await context.bot.send_message(
-            chat_id=user_id,
-            text=text,
-            parse_mode="Markdown",
-            reply_markup=keyboard
-        )
-        logger.info(f"Catalog reminder sent to {user_id}")
-    except Exception as e:
-        logger.error(f"Catalog reminder error {user_id}: {e}")
-
-def schedule_catalog_reminder(context, user_id: int, lang: str):
-    """Ставит напоминание через 2 часа."""
-    job_name = f"cat_remind_{user_id}"
-    # Отменяем старый job если был
-    for job in context.job_queue.get_jobs_by_name(job_name):
-        job.schedule_removal()
-    context.job_queue.run_once(
-        send_catalog_reminder,
-        when=7200,  # 2 часа
-        data={"user_id": user_id, "lang": lang},
-        name=job_name,
-        chat_id=user_id,
-        user_id=user_id,
-    )
-
 async def select_lang(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     country = context.user_data.get("country", "TKM")
@@ -751,18 +469,6 @@ async def select_lang(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown",
         reply_markup=get_main_keyboard(lang)
     )
-
-    # День 0 — сразу отправляем первое сообщение о компании
-    day0_text = ONBOARDING_MSG["day0"].get(lang, ONBOARDING_MSG["day0"]["ru"])
-    await update.message.reply_text(
-        day0_text,
-        parse_mode="Markdown",
-        reply_markup=get_main_keyboard(lang)
-    )
-
-    # Запускаем остальные сообщения цепочки
-    schedule_onboarding(context, user.id, lang, country)
-
     return CHAT
 
 # ─── Основной чат ────────────────────────────────────────────
@@ -783,17 +489,19 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return CHAT
 
-    # Кнопка каталога
+    # Кнопка каталога — Mini App
     if text in [t["catalog"], "📖 Каталог", "📖 Katalog"]:
-        catalog_text = get_catalog_text(lang, country)
-        await update.message.reply_text(
-            catalog_text,
-            parse_mode="Markdown",
-            reply_markup=get_main_keyboard(lang)
-        )
-        # Фиксируем просмотр и ставим напоминание через 2 часа
+        mini_app_text = {
+            "ru": "📖 Откройте наш каталог в Mini App:\n\n👉 https://t.me/Verteratkmbot/vertera_tkm\n\nТам все продукты с фото, описаниями и ценами 🌿",
+            "tk": "📖 Katalogumuzy Mini App-da açyň:\n\n👉 https://t.me/Verteratkmbot/vertera_tkm\n\nOrada ähli önümler suratlar, beýanlar we bahalar bilen 🌿",
+            "uz": "📖 Katalogimizni Mini App-da oching:\n\n👉 https://t.me/Verteratkmbot/vertera_tkm\n\nU yerda barcha mahsulotlar rasmlar, tavsiflar va narxlar bilan 🌿",
+        }
         db_set_catalog_viewed(user.id)
         schedule_catalog_reminder(context, user.id, lang)
+        await update.message.reply_text(
+            mini_app_text.get(lang, mini_app_text["ru"]),
+            reply_markup=get_main_keyboard(lang)
+        )
         return CHAT
 
     # Кнопка связаться
@@ -806,8 +514,6 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Кнопка купить продукт
     if text in [t["buy"], "🛒 Купить продукт", "🛒 Önüm satyn almak", "🛒 Mahsulot sotib olish"]:
-        # Фиксируем интерес — напоминание не нужно
-        db_set_catalog_acted(user.id)
         try:
             country_label = "Туркменистан 🇹🇲" if country == "TKM" else "Узбекистан 🇺🇿"
             uname = f"@{user.username}" if user.username else str(user.id)
@@ -847,7 +553,6 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Кнопка бизнес
     if text in [t["business"], "💼 Бизнес с Vertera", "💼 Vertera bilen iş", "💼 Vertera bilan biznes"]:
-        db_set_catalog_acted(user.id)
         try:
             country_label = "Туркменистан 🇹🇲" if country == "TKM" else "Узбекистан 🇺🇿"
             uname = f"@{user.username}" if user.username else str(user.id)
@@ -859,6 +564,7 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.error(f"Biz notify: {e}")
         business_menu = ReplyKeyboardMarkup(
             [
+                ["📊 Узнать больше о доходе"],
                 [t["anketa_yes"]],
                 [t["register_btn"]],
                 [t["home"]],
@@ -950,6 +656,68 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(t["anketa_ok"], reply_markup=get_main_keyboard(lang))
         return CHAT
 
+    # Кнопка Узнать больше о доходе
+    if text in ["📊 Узнать больше о доходе", "📊 Girdeji barada has köp", "📊 Daromad haqida ko'proq"]:
+        detail = {
+            "ru": (
+                "📊 *Система дохода Vertera — подробно*\n\n"
+                "💰 *Сколько реально зарабатывают?*\n"
+                "• 2–5 партнёров: 80–200 UE/мес (1 200–3 000 манат / 800K–2M сум)\n"
+                "• 10+ партнёров: 400–800 UE/мес\n"
+                "• 50+ партнёров: 2 000–5 000 UE/мес\n"
+                "• 100+ партнёров: доход неограничен\n\n"
+                "⚙️ *Три источника дохода:*\n\n"
+                "1️⃣ *Бонус за приглашение* — 40% с каждой покупки партнёра\n"
+                "Пример: партнёр купил на 100 PV → ты получаешь 40 UE (600 манат)\n\n"
+                "2️⃣ *Бинарный бонус* — доход с двух веток\n"
+                "40 PV слева + 40 PV справа = 1 цикл = 8–14 UE\n\n"
+                "3️⃣ *Бонус наставника* — до 50% с доходов команды на 10 уровней\n\n"
+                "✅ Условие: личная покупка от 20 PV в месяц\n\n"
+                "Готов начать? Заполни анкету 🌿"
+            ),
+            "tk": (
+                "📊 *Vertera girdeji ulgamy — jikme-jik*\n\n"
+                "💰 *Hakykatda näçe gazanylýar?*\n"
+                "• 2–5 hyzmatdaş: 80–200 UE/aý\n"
+                "• 10+ hyzmatdaş: 400–800 UE/aý\n"
+                "• 50+ hyzmatdaş: 2 000–5 000 UE/aý\n"
+                "• 100+: çäksiz girdeji\n\n"
+                "⚙️ *Üç girdeji çeşmesi:*\n\n"
+                "1️⃣ *Çakylyk bonusy* — hyzmatdaşyň her satyn alşyndan 40%\n"
+                "Mysal: 100 PV satyn aldy → 40 UE (600 manat) alýarsyň\n\n"
+                "2️⃣ *Binar bonusy* — iki şahadan girdeji\n"
+                "40 PV çep + 40 PV sag = 1 sikl = 8–14 UE\n\n"
+                "3️⃣ *Halypa bonusy* — 10 derejä çenli toparyň girdejisinden 50%\n\n"
+                "✅ Şert: aýda 20 PV şahsy satyn alyş\n\n"
+                "Başlamaga taýynmy? Anketa dolduryň 🌿"
+            ),
+            "uz": (
+                "📊 *Vertera daromad tizimi — batafsil*\n\n"
+                "💰 *Haqiqatda qancha daromad?*\n"
+                "• 2–5 hamkor: 80–200 UE/oy\n"
+                "• 10+ hamkor: 400–800 UE/oy\n"
+                "• 50+ hamkor: 2 000–5 000 UE/oy\n"
+                "• 100+: cheksiz daromad\n\n"
+                "⚙️ *Uch daromad manbai:*\n\n"
+                "1️⃣ *Taklif bonusi* — hamkorning har xarididan 40%\n"
+                "Misol: 100 PV sotib oldi → 40 UE (400 000 so'm) olasan\n\n"
+                "2️⃣ *Binar bonus* — ikki tarmoqdan daromad\n"
+                "40 PV chap + 40 PV o'ng = 1 sikl = 8–14 UE\n\n"
+                "3️⃣ *Murabbiy bonusi* — 10 darajagacha jamoadan 50%\n\n"
+                "✅ Shart: oyiga 20 PV shaxsiy xarid\n\n"
+                "Boshlashga tayyormisiz? Anketa to'ldiring 🌿"
+            ),
+        }
+        await update.message.reply_text(
+            detail.get(lang, detail["ru"]),
+            parse_mode="Markdown",
+            reply_markup=ReplyKeyboardMarkup(
+                [[t["anketa_yes"]], [t["home"]]],
+                resize_keyboard=True
+            )
+        )
+        return CHAT
+
     # GPT
     if user.id not in user_histories:
         user_histories[user.id] = []
@@ -992,9 +760,6 @@ async def start_anketa(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.text == t["anketa_no"]:
         await update.message.reply_text(t["anketa_ok"], reply_markup=get_main_keyboard(lang))
         return CHAT
-    user = update.effective_user
-    # Каталог просмотрен с действием — не напоминать
-    db_set_catalog_acted(user.id)
     await update.message.reply_text(t["anketa_start"], reply_markup=ReplyKeyboardRemove())
     return ANKETA_NAME
 
