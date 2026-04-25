@@ -14,6 +14,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 GOOGLE_SHEET_URL = os.getenv("GOOGLE_SHEET_URL", "https://script.google.com/macros/s/AKfycbzqwkgp8nSXxtSN1VB16QObhcOgqY4ye45-_Xmpc9OgAQnhQLAdL3EcjcSSg8zz05c/exec")
 
 SPONSOR_USERNAME = "@tach_ttt"
+MANAGER_CHAT_ID = 699255285  # @tach_ttt
 SPONSOR_PHONE_TKM = "+99363327177"
 SPONSOR_PHONE_UZB = "+99363327177"
 CATALOG_LINK = "https://t.me/Verteratkmbot/vertera_tkm"
@@ -490,8 +491,15 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Кнопка каталога — Mini App
     if text in [t["catalog"], "📖 Каталог", "📖 Katalog"]:
+        mini_app_text = {
+            "ru": "📖 Откройте наш каталог в Mini App:\n\n👉 https://t.me/Verteratkmbot/vertera_tkm\n\nТам все продукты с фото, описаниями и ценами 🌿",
+            "tk": "📖 Katalogumuzy Mini App-da açyň:\n\n👉 https://t.me/Verteratkmbot/vertera_tkm\n\nOrada ähli önümler suratlar, beýanlar we bahalar bilen 🌿",
+            "uz": "📖 Katalogimizni Mini App-da oching:\n\n👉 https://t.me/Verteratkmbot/vertera_tkm\n\nU yerda barcha mahsulotlar rasmlar, tavsiflar va narxlar bilan 🌿",
+        }
+        db_set_catalog_viewed(user.id)
+        schedule_catalog_reminder(context, user.id, lang)
         await update.message.reply_text(
-            t["catalog_text"].format(catalog_link=CATALOG_LINK),
+            mini_app_text.get(lang, mini_app_text["ru"]),
             reply_markup=get_main_keyboard(lang)
         )
         return CHAT
@@ -510,7 +518,7 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
             country_label = "Туркменистан 🇹🇲" if country == "TKM" else "Узбекистан 🇺🇿"
             uname = f"@{user.username}" if user.username else str(user.id)
             await context.bot.send_message(
-                chat_id="@tach_ttt",
+                chat_id=MANAGER_CHAT_ID,
                 text=f"🛒 Интерес к покупке\n🌍 {country_label} | 🗣 {lang}\n👤 {user.full_name or uname} | 🆔 {uname}"
             )
         except Exception as e:
@@ -549,13 +557,14 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
             country_label = "Туркменистан 🇹🇲" if country == "TKM" else "Узбекистан 🇺🇿"
             uname = f"@{user.username}" if user.username else str(user.id)
             await context.bot.send_message(
-                chat_id="@tach_ttt",
+                chat_id=MANAGER_CHAT_ID,
                 text=f"💼 Интерес к бизнесу\n🌍 {country_label} | 🗣 {lang}\n👤 {user.full_name or uname} | 🆔 {uname}"
             )
         except Exception as e:
             logger.error(f"Biz notify: {e}")
         business_menu = ReplyKeyboardMarkup(
             [
+                ["📊 Узнать больше о доходе"],
                 [t["anketa_yes"]],
                 [t["register_btn"]],
                 [t["home"]],
@@ -645,6 +654,77 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await start_anketa(update, context)
     if text in NO:
         await update.message.reply_text(t["anketa_ok"], reply_markup=get_main_keyboard(lang))
+        return CHAT
+
+    # Кнопка Узнать больше о доходе
+    if text in ["📊 Узнать больше о доходе", "📊 Girdeji barada has köp", "📊 Daromad haqida ko'proq"]:
+        detail = {
+            "ru": (
+                "📊 *Как вы будете зарабатывать?*\n\n"
+                "На первых порах у вас будет *4 бонуса*, которые помогут зарабатывать:\n\n"
+                "1️⃣ *БЗП — Бонус за приглашение*\n"
+                "40% с каждой покупки вашего партнёра. "
+                "Пригласил — он купил — ты получил бонус сразу.\n\n"
+                "2️⃣ *Клубный бонус*\n"
+                "Когда твоя первая линия достигает нужного объёма — "
+                "получаешь фиксированную выплату (55 или 110 UE). "
+                "Выполнил условие — получил.\n\n"
+                "3️⃣ *КББ — Командный бинарный бонус*\n"
+                "Строишь две ветки. Накопилось по 40 PV в каждой — "
+                "цикл закрылся, бонус начислен. "
+                "Чем активнее команда, тем больше циклов.\n\n"
+                "4️⃣ *БЗК — Бонус за квалификацию*\n"
+                "Единовременная выплата при достижении нового статуса. "
+                "Растёшь — получаешь награду за каждый новый уровень.\n\n"
+                "Хотите узнать больше — нажмите кнопку *«📞 Связаться»* 🌿"
+            ),
+            "tk": (
+                "📊 *Siz nähili gazanarsyňyz?*\n\n"
+                "Başlangyjynda size gazanmaga kömek etjek *4 bonus* bar:\n\n"
+                "1️⃣ *BZP — Çakylyk bonusy*\n"
+                "Hyzmatdaşyňyzyň her satyn alşyndan 40%. "
+                "Adam çagyr, ol satyn alsyn — bonus dessine geýdi.\n\n"
+                "2️⃣ *Klub bonusy*\n"
+                "Birinji liniýaň zerur göwrüme ýetende — "
+                "kesgitli töleg alýarsyň (55 ýa-da 110 UE). "
+                "Şerti ýerine getirdiň — aldyň.\n\n"
+                "3️⃣ *KBB — Topar binar bonusy*\n"
+                "Iki şaha gurýarsyň. Her birinde 40 PV toplananda — "
+                "sikl ýapylýar, bonus hasaplanýar. "
+                "Topar näçe işjeň bolsa, sikl şonça köp.\n\n"
+                "4️⃣ *BZK — Derejä ýetmek bonusy*\n"
+                "Täze statusa ýetileninde bir gezek töleg. "
+                "Gurluşda ösýärsiň — her täze dereje üçin sylag.\n\n"
+                "Köpräk bilmek isleýärsiňizmi — *«📞 Habarlaşmak»* düwmesine basyň 🌿"
+            ),
+            "uz": (
+                "📊 *Siz qanday daromad olasiz?*\n\n"
+                "Dastlabki bosqichda sizga yordam beradigan *4 bonus* bor:\n\n"
+                "1️⃣ *BZP — Taklif bonusi*\n"
+                "Hamkoringizning har xarididan 40%. "
+                "Odam taklif qil, u sotib olsin — bonus darhol keladi.\n\n"
+                "2️⃣ *Klub bonusi*\n"
+                "Birinchi liniyangiz kerakli hajmga yetganda — "
+                "belgilangan to'lov olasiz (55 yoki 110 UE). "
+                "Shartni bajarding — oldingiz.\n\n"
+                "3️⃣ *KBB — Jamoa binar bonusi*\n"
+                "Ikki tarmoq qurasan. Har birida 40 PV to'planganda — "
+                "sikl yopiladi, bonus hisoblanadi. "
+                "Jamoa qanchalik faol bo'lsa, sikl shunchalik ko'p.\n\n"
+                "4️⃣ *BZK — Malaka bonusi*\n"
+                "Yangi statusga erishilganda bir martalik to'lov. "
+                "O'sasan — har yangi daraja uchun mukofot.\n\n"
+                "Ko'proq bilmoqchimisiz — *«📞 Bog'lanish»* tugmasini bosing 🌿"
+            ),
+        }
+        await update.message.reply_text(
+            detail.get(lang, detail["ru"]),
+            parse_mode="Markdown",
+            reply_markup=ReplyKeyboardMarkup(
+                [[t["anketa_yes"]], [t["register_btn"]], [t["contact"]], [t["home"]]],
+                resize_keyboard=True
+            )
+        )
         return CHAT
 
     # GPT
@@ -743,7 +823,7 @@ async def anketa_interest(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         await context.bot.send_message(
-            chat_id="@tach_ttt",
+            chat_id=MANAGER_CHAT_ID,
             text=(
                 f"📥 Новая заявка Vertera!\n\n"
                 f"🌍 Страна: {country_label}\n"
