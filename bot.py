@@ -16,7 +16,7 @@ GOOGLE_SHEET_URL = os.getenv("GOOGLE_SHEET_URL", "https://script.google.com/macr
 SPONSOR_USERNAME = "@tach_ttt"
 MANAGER_CHAT_ID = 699255285  # @tach_ttt
 SPONSOR_PHONE_TKM = "+99363327177"
-SPONSOR_PHONE_UZB = "+99363327177"
+SPONSOR_PHONE_UZB = "+998774301234"
 CATALOG_LINK = "https://t.me/Verteratkmbot/vertera_tkm"
 REGISTER_LINK = "https://id.boss.vertera.org/register?ref=FEKMPTVL85&service=OS3_PARTNER"
 
@@ -115,7 +115,7 @@ REG_INSTRUCTIONS = {
             "6️⃣ Подождите *10 секунд* — появится кнопка, нажмите на неё\n\n"
             "7️⃣ Вы получите свой личный *ID-номер* 🎉\n\n"
             "8️⃣ Нажмите *«На главную»* — вы попадёте на страницу входа в личный кабинет\n\n"
-            "Если возникнут трудности — напишите нам: {sponsor}"
+            "Если возникнут трудности — напишите нам: {SPONSOR_USERNAME}"
         ),
         "tk": (
             "📋 *Hasaba alyş görkezmeleri (Türkmenistan):*\n\n"
@@ -127,7 +127,7 @@ REG_INSTRUCTIONS = {
             "6️⃣ *10 sekunt* garaşyň — düwme peýda bolar, basyň\n\n"
             "7️⃣ Şahsy *ID belgiňizi* alarsyňyz 🎉\n\n"
             "8️⃣ *«Baş sahypa»* düwmesine basyň — şahsy otaga giriş sahypasyna geçersiňiz\n\n"
-            "Kynçylyk çeksеňiz — bize ýazyň: {sponsor}"
+            "Kynçylyk çeksеňiz — bize ýazyň: {SPONSOR_USERNAME}"
         ),
     },
     "UZB": {
@@ -140,7 +140,7 @@ REG_INSTRUCTIONS = {
             "5️⃣ Введите код из SMS\n\n"
             "6️⃣ Вы получите свой личный *ID-номер* 🎉\n\n"
             "7️⃣ Войдите в личный кабинет по номеру телефона\n\n"
-            "Если возникнут трудности — напишите нам: {sponsor}"
+            "Если возникнут трудности — напишите нам: {SPONSOR_USERNAME}"
         ),
         "uz": (
             "📋 *Ro'yxatdan o'tish ko'rsatmalari (O'zbekiston):*\n\n"
@@ -151,7 +151,7 @@ REG_INSTRUCTIONS = {
             "5️⃣ SMS-dan kodni kiriting\n\n"
             "6️⃣ Shaxsiy *ID-raqamingizni* olasiz 🎉\n\n"
             "7️⃣ Telefon raqami orqali shaxsiy kabinetga kiring\n\n"
-            "Qiyinchilik bo'lsa — bizga yozing: {sponsor}"
+            "Qiyinchilik bo'lsa — bizga yozing: {SPONSOR_USERNAME}"
         ),
     }
 }
