@@ -905,6 +905,11 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(t["anketa_ok"], reply_markup=get_main_keyboard(lang))
         return CHAT
 
+    # Кнопка "Я партнёр" — надёжная проверка без Regex
+    partner_btns = [pt.get("btn", "") for pt in PARTNER_TEXTS.values()]
+    if text in partner_btns:
+        return await partner_entry(update, context)
+
     # Кнопка Узнать больше о доходе
     if text in ["📊 Узнать больше о доходе", "📊 Girdeji barada has köp", "📊 Daromad haqida ko'proq"]:
         detail = {
@@ -1163,12 +1168,13 @@ async def partner_approve_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE
     if str(update.effective_user.id) != str(MANAGER_CHAT_ID):
         return
     try:
-        target_id = int(text.split("_")[1])
+        target_id = int(text.strip().split("_")[1])
     except (IndexError, ValueError):
+        await update.message.reply_text("Неверный формат. Используйте /approve_123456789")
         return
     info = pending_get(target_id)
     if not info:
-        await update.message.reply_text("Запрос не найден.")
+        await update.message.reply_text("Запрос не найден. Возможно уже обработан.")
         return
     partner_add(target_id, info.get("name",""), info.get("company_id",""), info.get("lang","ru"))
     pending_remove(target_id)
@@ -1190,12 +1196,13 @@ async def partner_reject_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if str(update.effective_user.id) != str(MANAGER_CHAT_ID):
         return
     try:
-        target_id = int(text.split("_")[1])
+        target_id = int(text.strip().split("_")[1])
     except (IndexError, ValueError):
+        await update.message.reply_text("Неверный формат. Используйте /reject_123456789")
         return
     info = pending_get(target_id)
     if not info:
-        await update.message.reply_text("Запрос не найден.")
+        await update.message.reply_text("Запрос не найден. Возможно уже обработан.")
         return
     pending_remove(target_id)
     lang = info.get("lang", "ru")
@@ -1332,18 +1339,12 @@ async def partner_contacts_phone(update: Update, context: ContextTypes.DEFAULT_T
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
-    # Паттерны кнопки "Я партнёр" на всех языках
-    partner_btn_filter = filters.Regex(
-        r"^(🤝 Я партнёр|🤝 Men hyzmatdaş|🤝 Men hamkorman)$"
-    )
-
     conv = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
             SELECT_COUNTRY: [MessageHandler(filters.TEXT & ~filters.COMMAND, select_country)],
             SELECT_LANG: [MessageHandler(filters.TEXT & ~filters.COMMAND, select_lang)],
             CHAT: [
-                MessageHandler(partner_btn_filter, partner_entry),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, chat_with_gpt),
             ],
             PARTNER_ID: [
@@ -1369,12 +1370,13 @@ def main():
     app.add_handler(conv)
 
     # Команды одобрения/отклонения от менеджера
+    # /approve_XXXXX и /reject_XXXXX приходят как обычные сообщения (не команды)
     app.add_handler(MessageHandler(
-        filters.Regex(r"^/approve_\d+$") & filters.TEXT,
+        filters.Regex(r"^/approve_[0-9]+") & filters.TEXT,
         partner_approve_cmd
     ))
     app.add_handler(MessageHandler(
-        filters.Regex(r"^/reject_\d+$") & filters.TEXT,
+        filters.Regex(r"^/reject_[0-9]+") & filters.TEXT,
         partner_reject_cmd
     ))
     logger.info("🤖 Vertera bot started!")
