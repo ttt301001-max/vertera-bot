@@ -74,7 +74,13 @@ PT = {
         "menu_title":   "🤝 Партнёрское меню — выберите раздел:",
         "btn_learn":    "📚 Обучение",
         "btn_market":   "📊 Маркетинг",
-        "btn_calc":     "🧮 Калькулятор дохода",
+        "btn_webinar":  "📅 Записаться на вебинар",
+        "webinar_ask":   "📅 *ZOOM-вебинар с наставником*\n\nВы можете записаться на вебинар с вышестоящим наставником и его командой.\n\nНа вебинаре:\n• Разбор маркетинга и бонусов\n• Ответы на вопросы\n• Знакомство с командой\n• Первые шаги в бизнесе\n\nВведите ваше *имя и удобное время* для записи:",
+        "webinar_ok":    "✅ Заявка на вебинар отправлена! Менеджер свяжется с вами для подтверждения.",
+        "r_contacts":    "👋 Привет! Вы уже обзвонили ваши контакты? Это ключевой шаг — расскажите знакомым о продукте Vertera 📞",
+        "r_market":      "📊 Напоминание: вы изучили систему маркетинга Vertera? Нажмите «📊 Маркетинг» в меню партнёра для изучения 🌿",
+        "r_product":     "🌿 Вы уже изучили все продукты Vertera? Зайдите в «📚 Обучение» и пройдите все шаги.",
+        "r_try":         "🎁 Вы уже попробовали продукт лично? Личный опыт — лучший аргумент для вашей команды!",
         "btn_contacts": "👥 Мои контакты",
         "btn_news":     "📣 Новости",
         "btn_back":     "🔙 Выйти из меню партнёра",
@@ -120,7 +126,13 @@ PT = {
         "menu_title":   "🤝 Hyzmatdaş menýusy — bölüm saýlaň:",
         "btn_learn":    "📚 Okuw",
         "btn_market":   "📊 Marketing",
-        "btn_calc":     "🧮 Girdeji kalkulýatory",
+        "btn_webinar":  "📅 Webinara ýazylmak",
+        "webinar_ask":   "📅 *Halypa bilen ZOOM-webinar*\n\nÝokary derejeli halypa we onuň topary bilen webinara ýazylyp bilersiňiz.\n\nWebinarda:\n• Marketing we bonuslary düşündirmek\n• Soraglara jogap bermek\n• Topar bilen tanyşmak\n• Işde ilkinji ädimler\n\nÝazylmak üçin *adyňyzy we amatly wagtyňyzy* giriziň:",
+        "webinar_ok":    "✅ Webinar üçin ýüz tutma iberildi! Menejer tassyklamak üçin siz bilen habarlaşar.",
+        "r_contacts":    "👋 Salam! Kontaktlaryňyzy jaňladyňyzmy? Bu esasy ädim — Vertera önümi barada tanşlaryňyza aýdyň 📞",
+        "r_market":      "📊 Ýatlatma: Vertera marketing ulgamyny öwrediňizmi? Öwrenmek üçin hyzmatdaş menýusynda «📊 Marketing» basyň 🌿",
+        "r_product":     "🌿 Ähli Vertera önümlerini öwrediňizmi? «📚 Okuw» bölümine giriň we ähli ädimlerden geçiň.",
+        "r_try":         "🎁 Önümi şahsy synap gördüňizmi? Şahsy tejribe — toparyňyz üçin iň gowy delil!",
         "btn_contacts": "👥 Meniň kontaktlarym",
         "btn_news":     "📣 Habarlar",
         "btn_back":     "🔙 Hyzmatdaş menýusyndan çyk",
@@ -166,7 +178,13 @@ PT = {
         "menu_title":   "🤝 Hamkorlik menyusi — bo'limni tanlang:",
         "btn_learn":    "📚 O'qitish",
         "btn_market":   "📊 Marketing",
-        "btn_calc":     "🧮 Daromad kalkulyatori",
+        "btn_webinar":  "📅 Vebinarga yozilish",
+        "webinar_ask":   "📅 *Murabbiy bilan ZOOM-vebinar*\n\nYuqori darajadagi murabbiy va uning jamoasi bilan vebinarga yozilishingiz mumkin.\n\nVebinarda:\n• Marketing va bonuslarni tushuntirish\n• Savollarga javob berish\n• Jamoa bilan tanishish\n• Biznesda birinchi qadamlar\n\nYozilish uchun *ismingiz va qulay vaqtingizni* kiriting:",
+        "webinar_ok":    "✅ Vebinar uchun ariza yuborildi! Menejer tasdiqlash uchun siz bilan bog'lanadi.",
+        "r_contacts":    "👋 Salom! Kontaktlaringizni qo'ng'iroq qildingizmi? Bu asosiy qadam — tanishlaringizga Vertera mahsuloti haqida ayting 📞",
+        "r_market":      "📊 Eslatma: Vertera marketing tizimini o'rgandingizmi? O'rganish uchun hamkor menyusida «📊 Marketing» tugmasini bosing 🌿",
+        "r_product":     "🌿 Barcha Vertera mahsulotlarini o'rgandingizmi? «📚 O'qitish» bo'limiga kiring va barcha qadamlardan o'ting.",
+        "r_try":         "🎁 Mahsulotni shaxsan sinab ko'rdingizmi? Shaxsiy tajriba — jamoangiz uchun eng yaxshi dalil!",
         "btn_contacts": "👥 Mening kontaktlarim",
         "btn_news":     "📣 Yangiliklar",
         "btn_back":     "🔙 Hamkorlik menyusidan chiqish",
@@ -208,7 +226,7 @@ def get_partner_kb(lang):
     p = PT.get(lang, PT["ru"])
     return ReplyKeyboardMarkup(
         [[p["btn_learn"],    p["btn_market"]],
-         [p["btn_calc"],     p["btn_contacts"]],
+         [p["btn_contacts"], p["btn_webinar"]],
          [p["btn_news"]],
          [p["btn_back"]]],
         resize_keyboard=True
@@ -1076,6 +1094,115 @@ async def partner_receive_id(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return CHAT
 
 
+# Тексты маркетинга с PV
+MARKET_FULL = {
+    "ru": (
+        "📊 *Маркетинг Vertera*\n\n"
+        "*Что такое PV?*\n"
+        "PV (Product Value) — это баллы продукта. Каждый товар имеет свою ценность в PV. "
+        "Все бонусы в системе рассчитываются именно через PV — не через деньги напрямую.\n\n"
+        "*Бонусы зависят от товарооборота команды:*\n"
+        "Чем больше суммарный PV твоей команды — тем выше статус и тем больше бонусов ты получаешь. "
+        "Это значит: твой доход растёт вместе с ростом команды автоматически.\n\n"
+        "С первых дней доступны 4 бонуса:\n\n"
+        "1️⃣ *БЗП* — 40% с каждой покупки партнёра\n"
+        "2️⃣ *Клубный бонус* — 55 или 110 UE за объём первой линии\n"
+        "3️⃣ *КББ* — бонус за каждый цикл 40+40 PV в ветках\n"
+        "4️⃣ *БЗК* — разовая выплата за достижение нового статуса\n\n"
+        "1 UE = 15 манат (TKM) / 10 000 сум (UZB)\n\n"
+        "Задай вопрос боту — он объяснит любой бонус подробно 🌿"
+    ),
+    "tk": (
+        "📊 *Vertera marketingi*\n\n"
+        "*PV näme?*\n"
+        "PV (Product Value) — önüm ballary. Her önümiň öz PV gymmaty bar. "
+        "Ulgamdaky ähli bonuslar PV arkaly hasaplanýar.\n\n"
+        "*Bonuslar toparyň haryt dolanyşygyna bagly:*\n"
+        "Toparyňyzyň umumy PV-si näçe ýokary bolsa — status şonça ýokary we bonuslar şonça köp. "
+        "Ýagny: girdejüňiz topar bilen bilelikde awtomatiki ösýär.\n\n"
+        "Ilkinji günden 4 bonus elýeterli:\n\n"
+        "1️⃣ *BZP* — hyzmatdaşyň her satyn alşyndan 40%\n"
+        "2️⃣ *Klub bonusy* — birinji liniýa göwrümi üçin 55 ýa-da 110 UE\n"
+        "3️⃣ *KBB* — şahalarda 40+40 PV her sikl üçin bonus\n"
+        "4️⃣ *BZK* — täze statusa ýetmek üçin bir gezek töleg\n\n"
+        "1 UE = 15 manat (TKM) / 10 000 sum (UZB)\n\n"
+        "Bota sorag ber — islendik bonusy düşündirer 🌿"
+    ),
+    "uz": (
+        "📊 *Vertera marketingi*\n\n"
+        "*PV nima?*\n"
+        "PV (Product Value) — mahsulot ballari. Har bir mahsulotning o'z PV qiymati bor. "
+        "Tizimdagi barcha bonuslar PV orqali hisoblanadi.\n\n"
+        "*Bonuslar jamoa tovar aylanmasiga bog'liq:*\n"
+        "Jamoangiznig umumiy PV-si qanchalik yuqori bo'lsa — status shunchalik yuqori va bonuslar ko'proq. "
+        "Ya'ni: daromadingiz jamoa bilan birga avtomatik o'sadi.\n\n"
+        "Birinchi kundan 4 ta bonus mavjud:\n\n"
+        "1️⃣ *BZP* — hamkorning har xarididan 40%\n"
+        "2️⃣ *Klub bonusi* — birinchi liniya hajmi uchun 55 yoki 110 UE\n"
+        "3️⃣ *KBB* — tarmoqlarda 40+40 PV har sikl uchun bonus\n"
+        "4️⃣ *BZK* — yangi statusga erishganda bir martalik to'lov\n\n"
+        "1 UE = 15 manat (TKM) / 10 000 so'm (UZB)\n\n"
+        "Botga savol ber — istalgan bonusni tushuntiradi 🌿"
+    ),
+}
+
+LEARN_FULL = {
+    "ru": (
+        "📚 *Обучение партнёра*\n\n"
+        "*Шаг 1 — Изучи продукт*\n"
+        "Попробуй все продукты сам. Только личный опыт убеждает.\n\n"
+        "*Шаг 2 — Изучи систему бонусов*\n"
+        "БЗП → Клубный бонус → КББ → БЗК\n"
+        "Нажми «📊 Маркетинг» для подробного разбора.\n\n"
+        "*Шаг 3 — Первые шаги*\n"
+        "• Составь список из 20 знакомых\n"
+        "• Расскажи о продукте 5 из них\n"
+        "• Пригласи 2 в команду (левая и правая ветка)\n\n"
+        "*Шаг 4 — Веди контакты*\n"
+        "Добавляй клиентов в «👥 Мои контакты» и следи за статусом 🌿\n\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "📅 *ZOOM-вебинар с наставником*\n"
+        "Хотите познакомиться с командой, задать вопросы и получить поддержку лично?\n"
+        "Запишитесь на вебинар — нажмите кнопку ниже 👇"
+    ),
+    "tk": (
+        "📚 *Hyzmatdaş okuwы*\n\n"
+        "*Ädim 1 — Önümi öwren*\n"
+        "Ähli önümleri özüň synap gör. Diňe şahsy tejribe ynandyrýar.\n\n"
+        "*Ädim 2 — Bonus ulgamyny öwren*\n"
+        "BZP → Klub bonusy → KBB → BZK\n"
+        "Jikme-jik üçin «📊 Marketing» saýlaň.\n\n"
+        "*Ädim 3 — Ilkinji ädimler*\n"
+        "• 20 tanşyň sanawyny düz\n"
+        "• Olaryň 5-ine önüm barada aýt\n"
+        "• 2-sini topara çagyr (çep we sag şaha)\n\n"
+        "*Ädim 4 — Kontaktlary ýöret*\n"
+        "Müşderileri «👥 Meniň kontaktlarym»-a goş 🌿\n\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "📅 *Halypa bilen ZOOM-webinar*\n"
+        "Topar bilen tanyşmak, sorag bermek we goldaw almak isleýärsiňizmi?\n"
+        "Webinara ýazylyň — aşakdaky düwmä basyň 👇"
+    ),
+    "uz": (
+        "📚 *Hamkor o'qitish*\n\n"
+        "*Qadam 1 — Mahsulotni o'rgan*\n"
+        "Barcha mahsulotlarni o'zing sinab ko'r. Faqat shaxsiy tajriba ishontiradi.\n\n"
+        "*Qadam 2 — Bonus tizimini o'rgan*\n"
+        "BZP → Klub bonusi → KBB → BZK\n"
+        "Batafsil uchun «📊 Marketing» tanlang.\n\n"
+        "*Qadam 3 — Birinchi qadamlar*\n"
+        "• 20 tanishdan ro'yxat tuzing\n"
+        "• Ulardan 5 tasiga mahsulot haqida ayting\n"
+        "• 2 tasini jamoaga taklif qiling (chap va o'ng tarmoq)\n\n"
+        "*Qadam 4 — Kontaktlarni boshqaring*\n"
+        "Mijozlarni «👥 Mening kontaktlarim»ga qo'shing 🌿\n\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "📅 *Murabbiy bilan ZOOM-vebinar*\n"
+        "Jamoa bilan tanishish, savol berish va yordam olishni xohlaysizmi?\n"
+        "Vebinarga yoziling — quyidagi tugmani bosing 👇"
+    ),
+}
+
 async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка кнопок внутри партнёрского меню."""
     lang = context.user_data.get("lang", "ru")
@@ -1091,38 +1218,54 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         return CHAT
 
-    # Обучение
+    # Обучение — с предложением вебинара
     if text == p["btn_learn"]:
-        await update.message.reply_text(p["learn"], parse_mode="Markdown", reply_markup=get_partner_kb(lang))
+        learn_kb = ReplyKeyboardMarkup(
+            [[p["btn_webinar"]], [p["btn_back"]]],
+            resize_keyboard=True
+        )
+        await update.message.reply_text(
+            LEARN_FULL.get(lang, LEARN_FULL["ru"]),
+            parse_mode="Markdown",
+            reply_markup=learn_kb
+        )
         return PARTNER_MENU
 
-    # Маркетинг
+    # Маркетинг — с PV и товарооборотом
     if text == p["btn_market"]:
-        await update.message.reply_text(p["market"], parse_mode="Markdown", reply_markup=get_partner_kb(lang))
+        await update.message.reply_text(
+            MARKET_FULL.get(lang, MARKET_FULL["ru"]),
+            parse_mode="Markdown",
+            reply_markup=get_partner_kb(lang)
+        )
         return PARTNER_MENU
 
-    # Калькулятор
-    if text == p["btn_calc"]:
-        context.user_data["calc_wait"] = True
-        await update.message.reply_text(p["calc_ask"], reply_markup=ReplyKeyboardRemove())
+    # Вебинар — записаться
+    if text == p.get("btn_webinar", ""):
+        context.user_data["webinar_wait"] = True
+        await update.message.reply_text(
+            p.get("webinar_ask", "Введите имя и удобное время:"),
+            parse_mode="Markdown",
+            reply_markup=ReplyKeyboardRemove()
+        )
         return PARTNER_MENU
 
-    if context.user_data.pop("calc_wait", False):
+    if context.user_data.pop("webinar_wait", False):
+        uname = f"@{user.username}" if user.username else str(user.id)
         try:
-            n  = int(text.strip())
-            ue = n * 40
-            await update.message.reply_text(
-                f"🧮 *Расчёт дохода*\n\n"
-                f"Активных партнёров: {n}\n"
-                f"Ориентировочный БЗП в месяц: ~{ue} UE\n"
-                f"• TKM: ~{ue*15:,} манат\n"
-                f"• UZB: ~{ue*10000:,} сум\n\n"
-                f"_Это только БЗП. С бинаром и клубным бонусом доход выше_ 🌿",
-                parse_mode="Markdown",
-                reply_markup=get_partner_kb(lang)
+            await context.bot.send_message(
+                chat_id=MANAGER_CHAT_ID,
+                text=f"📅 Заявка на вебинар\n\n"
+                     f"👤 {user.full_name or uname}\n"
+                     f"🆔 {uname}\n"
+                     f"📝 {text}"
             )
-        except ValueError:
-            await update.message.reply_text("Введите число, например: 10", reply_markup=get_partner_kb(lang))
+        except Exception as e:
+            logger.error(f"webinar notify: {e}")
+        await update.message.reply_text(
+            p.get("webinar_ok", "✅ Заявка отправлена!"),
+            reply_markup=get_partner_kb(lang)
+        )
         return PARTNER_MENU
 
     # Контакты
@@ -1190,6 +1333,8 @@ async def partner_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id=uid, text=p["approved"],
             reply_markup=get_partner_kb(lang)
         )
+        # Запускаем серию напоминаний
+        schedule_partner_reminders(context, uid, lang)
     except Exception as e:
         logger.error(f"approve send: {e}")
     await update.message.reply_text(f"✅ {info.get('name')} одобрен как партнёр!")
@@ -1216,6 +1361,170 @@ async def partner_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"❌ Запрос от {info.get('name')} отклонён.")
 
 
+# ─── Напоминания для партнёров ───────────────────────────────
+
+async def send_partner_reminder(context) -> None:
+    """Job: отправляет одно напоминание партнёру."""
+    job     = context.job
+    uid     = job.data["uid"]
+    lang    = job.data["lang"]
+    msg_key = job.data["msg_key"]
+    p       = PT.get(lang, PT["ru"])
+    text    = p.get(msg_key, "")
+    if not text:
+        return
+    try:
+        await context.bot.send_message(chat_id=uid, text=text)
+    except Exception as e:
+        logger.error(f"partner reminder {uid}/{msg_key}: {e}")
+
+def schedule_partner_reminders(context, uid: int, lang: str):
+    """Планирует серию напоминаний после одобрения партнёра."""
+    base = f"prem_{uid}"
+    # Через 1 день — обзвонил ли контакты?
+    context.job_queue.run_once(
+        send_partner_reminder, when=86400,
+        data={"uid": uid, "lang": lang, "msg_key": "r_contacts"},
+        name=f"{base}_contacts", chat_id=uid, user_id=uid
+    )
+    # Через 2 дня — изучил ли маркетинг?
+    context.job_queue.run_once(
+        send_partner_reminder, when=172800,
+        data={"uid": uid, "lang": lang, "msg_key": "r_market"},
+        name=f"{base}_market", chat_id=uid, user_id=uid
+    )
+    # Через 3 дня — изучил ли продукты?
+    context.job_queue.run_once(
+        send_partner_reminder, when=259200,
+        data={"uid": uid, "lang": lang, "msg_key": "r_product"},
+        name=f"{base}_product", chat_id=uid, user_id=uid
+    )
+    # Через 5 дней — попробовал ли продукт?
+    context.job_queue.run_once(
+        send_partner_reminder, when=432000,
+        data={"uid": uid, "lang": lang, "msg_key": "r_try"},
+        name=f"{base}_try", chat_id=uid, user_id=uid
+    )
+
+# ─── Меню администратора ─────────────────────────────────────
+
+ADMIN_KB = ReplyKeyboardMarkup(
+    [["👥 Список партнёров",  "📋 Заявки на вебинар"],
+     ["📣 Рассылка партнёрам","🎥 Отправить кружок"],
+     ["🔙 Выход из админ-меню"]],
+    resize_keyboard=True
+)
+
+async def admin_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/admin — открыть меню администратора."""
+    if update.effective_user.id != MANAGER_CHAT_ID:
+        return
+    await update.message.reply_text(
+        "👑 *Меню администратора*\n\nВыберите действие:",
+        parse_mode="Markdown",
+        reply_markup=ADMIN_KB
+    )
+
+async def admin_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обрабатывает кнопки admin-меню (только для менеджера)."""
+    if update.effective_user.id != MANAGER_CHAT_ID:
+        return
+    text = update.message.text
+
+    if text == "🔙 Выход из админ-меню":
+        await update.message.reply_text("Вышли из меню.", reply_markup=ReplyKeyboardRemove())
+        return
+
+    # Список одобренных партнёров
+    if text == "👥 Список партнёров":
+        partners = _jload(_PARTNERS_F)
+        if not partners:
+            await update.message.reply_text("Партнёров пока нет.", reply_markup=ADMIN_KB)
+            return
+        lines = []
+        for uid, info in partners.items():
+            lines.append(f"• {info.get('name','—')} | ID Vertera: {info.get('cid','—')} | lang: {info.get('lang','—')} | tg: {uid}")
+        await update.message.reply_text(
+            f"👥 *Партнёры ({len(lines)}):*\n\n" + "\n".join(lines),
+            parse_mode="Markdown",
+            reply_markup=ADMIN_KB
+        )
+        return
+
+    # Заявки на вебинар (pending)
+    if text == "📋 Заявки на вебинар":
+        pending = _jload(_PENDING_F)
+        if not pending:
+            await update.message.reply_text("Заявок на вебинар нет.", reply_markup=ADMIN_KB)
+            return
+        lines = []
+        for uid, info in pending.items():
+            lines.append(f"• {info.get('name','—')} | {info.get('uname','—')} | ID: {info.get('cid','—')}")
+        await update.message.reply_text(
+            f"📋 *Заявки ({len(lines)}):*\n\n" + "\n".join(lines),
+            parse_mode="Markdown",
+            reply_markup=ADMIN_KB
+        )
+        return
+
+    # Рассылка всем партнёрам
+    if text == "📣 Рассылка партнёрам":
+        context.user_data["admin_broadcast"] = True
+        await update.message.reply_text(
+            "Введите текст рассылки (он будет отправлен всем партнёрам):",
+            reply_markup=ReplyKeyboardRemove()
+        )
+        return
+
+    if context.user_data.pop("admin_broadcast", False):
+        partners = _jload(_PARTNERS_F)
+        sent, failed = 0, 0
+        for uid in partners:
+            try:
+                await context.bot.send_message(chat_id=int(uid), text=f"📣 *Сообщение от команды Vertera:*\n\n{text}", parse_mode="Markdown")
+                sent += 1
+            except Exception:
+                failed += 1
+        await update.message.reply_text(
+            f"✅ Рассылка завершена!\nОтправлено: {sent} | Ошибок: {failed}",
+            reply_markup=ADMIN_KB
+        )
+        return
+
+    # Отправить кружок (видео-заметку) — просим переслать
+    if text == "🎥 Отправить кружок":
+        context.user_data["admin_circle"] = True
+        await update.message.reply_text(
+            "Отправьте видео-кружок (video_note) — я перешлю его всем партнёрам:",
+            reply_markup=ReplyKeyboardRemove()
+        )
+        return
+
+    await update.message.reply_text("Выберите действие:", reply_markup=ADMIN_KB)
+
+async def admin_circle_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Получаем кружок от admin и рассылаем партнёрам."""
+    if update.effective_user.id != MANAGER_CHAT_ID:
+        return
+    if not context.user_data.pop("admin_circle", False):
+        return
+    if not update.message.video_note:
+        await update.message.reply_text("Это не кружок. Попробуйте снова.", reply_markup=ADMIN_KB)
+        return
+    partners = _jload(_PARTNERS_F)
+    sent, failed = 0, 0
+    fid = update.message.video_note.file_id
+    for uid in partners:
+        try:
+            await context.bot.send_video_note(chat_id=int(uid), video_note=fid)
+            sent += 1
+        except Exception:
+            failed += 1
+    await update.message.reply_text(
+        f"✅ Кружок отправлен!\nОтправлено: {sent} | Ошибок: {failed}",
+        reply_markup=ADMIN_KB
+    )
+
 # ─── main ─────────────────────────────────────────────────────
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
@@ -1240,9 +1549,22 @@ def main():
     )
     app.add_handler(conv)
 
-    # /apXXXXX и /rjXXXXX — команды менеджера для одобрения/отклонения
-    app.add_handler(MessageHandler(filters.Regex(r"^/ap\d+$"),  partner_approve))
-    app.add_handler(MessageHandler(filters.Regex(r"^/rj\d+$"),  partner_reject))
+    # /apXXXXX и /rjXXXXX — одобрение/отклонение партнёра
+    app.add_handler(MessageHandler(filters.Regex(r"^/ap\d+$"), partner_approve))
+    app.add_handler(MessageHandler(filters.Regex(r"^/rj\d+$"), partner_reject))
+
+    # Админ меню
+    app.add_handler(CommandHandler("admin", admin_cmd))
+    app.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex(r"^(👥 Список партнёров|📋 Заявки на вебинар|📣 Рассылка партнёрам|🎥 Отправить кружок|🔙 Выход из админ-меню)"),
+        admin_handler
+    ))
+    app.add_handler(MessageHandler(filters.VIDEO_NOTE, admin_circle_handler))
+    # Рассылка и кружок — произвольный текст/видео от admin
+    app.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND,
+        admin_handler
+    ))
     logger.info("🤖 Vertera bot started!")
     app.run_polling(drop_pending_updates=True)
 
