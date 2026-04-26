@@ -37,6 +37,7 @@ _PENDING_F   = pathlib.Path("/tmp/vrt_pending.json")
 _CONTACTS_F  = pathlib.Path("/tmp/vrt_contacts.json")
 _WEBINAR_F   = pathlib.Path("/tmp/vrt_webinar.json")
 _NEWS_F      = pathlib.Path("/tmp/vrt_news.json")
+_PROGRESS_F  = pathlib.Path("/tmp/vrt_progress.json")
 
 def _jload(p):
     try:
@@ -74,6 +75,52 @@ def pending_get(uid):        return _jload(_PENDING_F).get(str(uid), {})
 def pending_del(uid):
     d = _jload(_PENDING_F);  d.pop(str(uid), None);                              _jsave(_PENDING_F,  d)
 def contacts_get(uid):       return _jload(_CONTACTS_F).get(str(uid), [])
+# ─── Прогресс 7 дней ─────────────────────────────────────────
+
+def progress_get(uid: int) -> int:
+    """Возвращает текущий день партнёра (0 = не начал, 1-7 = день)."""
+    d = _jload(_PROGRESS_F)
+    return int(d.get(str(uid), {}).get("day", 0))
+
+def progress_set(uid: int, day: int):
+    """Устанавливает текущий день."""
+    d = _jload(_PROGRESS_F)
+    d[str(uid)] = {"day": day}
+    _jsave(_PROGRESS_F, d)
+
+async def progress_sync_to_sheets(uid: int, day: int, name: str, uname: str):
+    """Сохраняет прогресс в Google Sheets."""
+    try:
+        async with httpx.AsyncClient(follow_redirects=True) as c:
+            await c.post(GOOGLE_SHEET_URL, json={
+                "type":     "progress",
+                "user_id":  str(uid),
+                "name":     name,
+                "username": uname,
+                "day":      day,
+            }, timeout=10)
+    except Exception as e:
+        logger.error(f"progress_sync: {e}")
+
+async def progress_load_from_sheets():
+    """Загружает прогресс всех партнёров из Sheets при старте."""
+    try:
+        async with httpx.AsyncClient(follow_redirects=True) as c:
+            resp = await c.post(GOOGLE_SHEET_URL,
+                                json={"type": "get_progress"}, timeout=15)
+            data = resp.json()
+            if data.get("status") == "ok" and data.get("progress"):
+                d = _jload(_PROGRESS_F)
+                for row in data["progress"]:
+                    uid = str(row.get("user_id", "")).strip()
+                    day = int(row.get("day", 0))
+                    if uid:
+                        d[uid] = {"day": day}
+                _jsave(_PROGRESS_F, d)
+                logger.info(f"✅ Прогресс {len(data['progress'])} партнёров загружен")
+    except Exception as e:
+        logger.error(f"progress_load: {e}")
+
 def news_save(text: str):
     """Сохраняет новость."""
     import datetime
@@ -662,7 +709,11 @@ def get_phone(country: str) -> str:
     return SPONSOR_PHONE_TKM if country == "TKM" else SPONSOR_PHONE_UZB
 
 # ─── /start — выбор страны ───────────────────────────────────
-async def load_partners_from_sheets(app=None):
+async def load_all_on_start(app=None):
+    """Загружает партнёров и прогресс из Google Sheets при старте."""
+    await progress_load_from_sheets()
+
+async def _load_partners_impl(app=None):
     """Загружает партнёров из Google Sheets в локальный кэш при старте."""
     try:
         # Используем POST с type=get_partners (обходим проблему с GET/403)
@@ -690,7 +741,8 @@ async def load_partners_from_sheets(app=None):
             else:
                 logger.info(f"Sheets ответил: {data}")
     except Exception as e:
-        logger.error(f"load_partners_from_sheets error: {e}")
+        logger.error(f"load_partners error: {e}")
+    await progress_load_from_sheets()
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
@@ -1224,6 +1276,340 @@ MARKET_FULL = {
     ),
 }
 
+# 7 дней обучения
+DAYS = {
+    1: {
+        "ru": (
+            "🚀 *День 1 — Старт и снятие страха*\n\n"
+            "⚡ Помни: *Правило 72 часов* — если не действуешь 3 дня, ты \"остываешь\"!\n\n"
+            "*Цель:* начать действовать в первые часы\n\n"
+            "*Твои задания сегодня:*\n"
+            "1️⃣ Составить список контактов — минимум 30 человек\n"
+            "2️⃣ Отправить 3 приглашения\n\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "📲 *Скрипты приглашений (3 варианта):*\n\n"
+            "✅ *Вариант 1 — Нейтральный:*\n"
+            "_Привет! Я сейчас запускаю новый проект, хочу показать тебе идею. Давай встретимся на кофе, займет 20 минут. Когда тебе удобно?_\n\n"
+            "✅ *Вариант 2 — Через интерес:*\n"
+            "_Привет! Сейчас разбираюсь в одной интересной теме, связанной с доходом и новым рынком. Хочу тебе показать, думаю тебе зайдет. Когда сможем пересечься на 15–20 минут?_\n\n"
+            "✅ *Вариант 3 — Через личный контакт:*\n"
+            "_Привет! Есть тема, которую хочу с тобой обсудить лично. Сейчас начал новое направление, и ты один из первых, кому хочу показать. Давай увидимся?_\n\n"
+            "🧠 *Правило №1:* \"Я не продаю — я приглашаю\"\n\n"
+            "✅ Выполнил задания? Нажми кнопку ниже чтобы перейти к Дню 2 👇"
+        ),
+        "tk": (
+            "🚀 *1-nji gün — Başlangyç*\n\n"
+            "⚡ Ýatla: *72 sagat düzgüni* — 3 günde hereket etmeseň \"sowuýarsyň\"!\n\n"
+            "*Maksat:* ilkinji sagatlarda hereket etmek\n\n"
+            "*Şu günki tabşyryklar:*\n"
+            "1️⃣ Kontakt sanawy düzmek — azyndan 30 adam\n"
+            "2️⃣ 3 çakylyk ibermek\n\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "📲 *Çakylyk skriptleri (3 görnüş):*\n\n"
+            "✅ *1-nji görnüş — Bitarap:*\n"
+            "_Salam! Men häzir täze taslamany işe girizýärin, saňa bir pikir görkezmek isleýärin. Kofe içmäge duşuşaly, 20 minut alar. Haçan amatlydyr?_\n\n"
+            "✅ *2-nji görnüş — Gyzyklanma arkaly:*\n"
+            "_Salam! Häzir girdeji bilen bagly gyzykly bir tema öwrenýärin. Saňa görkezmek isleýärin. 15–20 minuta duşuşyp bolarmy?_\n\n"
+            "✅ *3-nji görnüş — Şahsy kontakt:*\n"
+            "_Salam! Seniň bilen şahsy maslahatlaşmak isleýän bir zat bar. Täze ugur başladym, ilki görkezmek isleýänlerimiň biri sensiň. Duşuşalymy?_\n\n"
+            "🧠 *Düzgün №1:* \"Men satmaýaryn — men çagyrýaryn\"\n\n"
+            "✅ Tabşyryklary ýerine ýetirdiňmi? 2-nji güne geçmek üçin aşakdaky düwmä bas 👇"
+        ),
+        "uz": (
+            "🚀 *1-kun — Boshlash*\n\n"
+            "⚡ Eslab qo'y: *72 soat qoidasi* — 3 kunda harakat qilmasang \"soviysan\"!\n\n"
+            "*Maqsad:* birinchi soatlarda harakat boshlash\n\n"
+            "*Bugungi vazifalar:*\n"
+            "1️⃣ Kontaktlar ro'yxatini tuzish — kamida 30 kishi\n"
+            "2️⃣ 3 ta taklif yuborish\n\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "📲 *Taklif skriptlari (3 variant):*\n\n"
+            "✅ *1-variant — Neytral:*\n"
+            "_Salom! Men hozir yangi loyihani ishga tushiryapman, senga bir g'oya ko'rsatmoqchiman. Kofe ichishga uchrashaylik, 20 daqiqa oladi. Qachon qulay?_\n\n"
+            "✅ *2-variant — Qiziqish orqali:*\n"
+            "_Salom! Daromad bilan bog'liq qiziqarli mavzuni o'rganmoqdaman. Senga ko'rsatmoqchiman. 15–20 daqiqaga uchrashamizmi?_\n\n"
+            "✅ *3-variant — Shaxsiy kontakt:*\n"
+            "_Salom! Sen bilan shaxsan gaplashmoqchi bo'lgan narsam bor. Yangi yo'nalish boshladim, birinchi ko'rsatmoqchi bo'lganlarimdan biri sensen. Uchrashaylikmi?_\n\n"
+            "🧠 *Qoida №1:* \"Men sotmayapman — men taklif qilyapman\"\n\n"
+            "✅ Vazifalarni bajardingmi? 2-kunga o'tish uchun quyidagi tugmani bos 👇"
+        ),
+    },
+    2: {
+        "ru": (
+            "🤝 *День 2 — Первая встреча*\n\n"
+            "*Задача:* не перегрузить, а зажечь интерес\n\n"
+            "*Твои задания сегодня:*\n"
+            "1️⃣ Провести 1–2 встречи (ты + наставник)\n"
+            "2️⃣ Показать: результаты, систему, продукт\n\n"
+            "*Инструменты:*\n"
+            "• Презентация (PDF / телефон)\n"
+            "• Короткое видео до 5 минут\n"
+            "• История успеха наставника\n\n"
+            "💡 *Правило встречи:* не обучай — показывай. Пусть говорит наставник!\n\n"
+            "✅ Провёл встречи? Нажми ниже чтобы перейти к Дню 3 👇"
+        ),
+        "tk": (
+            "🤝 *2-nji gün — Ilkinji duşuşyk*\n\n"
+            "*Wezipe:* artykmaç ýüklemek däl, gyzyklanma döretmek\n\n"
+            "*Şu günki tabşyryklar:*\n"
+            "1️⃣ 1–2 duşuşyk geçirmek (sen + halypa)\n"
+            "2️⃣ Görkezmek: netijeleri, ulgamy, önümi\n\n"
+            "*Gurallar:*\n"
+            "• Prezentasiýa (PDF / telefon)\n"
+            "• Gysga wideo (5 minut çenli)\n"
+            "• Halypanyň üstünlik taryhy\n\n"
+            "💡 *Duşuşyk düzgüni:* öwretme — görkez. Halypa gürlesin!\n\n"
+            "✅ Duşuşyklary geçirdiňmi? 3-nji güne geçmek üçin bas 👇"
+        ),
+        "uz": (
+            "🤝 *2-kun — Birinchi uchrashuv*\n\n"
+            "*Vazifa:* haddan tashqari yuklamaslik, qiziqish uyg'otish\n\n"
+            "*Bugungi vazifalar:*\n"
+            "1️⃣ 1–2 ta uchrashuv o'tkazish (sen + murabbiy)\n"
+            "2️⃣ Ko'rsatish: natijalar, tizim, mahsulot\n\n"
+            "*Vositalar:*\n"
+            "• Taqdimot (PDF / telefon)\n"
+            "• Qisqa video 5 daqiqagacha\n"
+            "• Murabbiyning muvaffaqiyat tarixi\n\n"
+            "💡 *Uchrashuv qoidasi:* o'rgatma — ko'rsat. Murabbiy gapirsin!\n\n"
+            "✅ Uchrashuvlarni o'tkazdingmi? 3-kunga o'tish uchun bos 👇"
+        ),
+    },
+    3: {
+        "ru": (
+            "🔄 *День 3 — Контроль и масштаб*\n\n"
+            "*Задача:* закрепить действие\n\n"
+            "*Твои задания сегодня:*\n"
+            "1️⃣ Разбор: что получилось, где был страх?\n"
+            "2️⃣ Отправить ещё 5 сообщений\n"
+            "3️⃣ Добавить новых людей в свою воронку\n\n"
+            "*Инструменты:*\n"
+            "• Чек-лист ошибок\n"
+            "• Скрипт ответов на \"нет\":\n"
+            "_\"Понимаю, что сейчас не лучшее время. Можно просто покажу информацию, займёт 5 минут?\"_\n\n"
+            "💡 Каждое \"нет\" — это шаг к \"да\"!\n\n"
+            "✅ Сделал задания? Нажми ниже чтобы перейти к Дню 4 👇"
+        ),
+        "tk": (
+            "🔄 *3-nji gün — Gözegçilik we masştab*\n\n"
+            "*Wezipe:* hereket berkitmek\n\n"
+            "*Şu günki tabşyryklar:*\n"
+            "1️⃣ Derňew: näme boldy, nirede gorkudy?\n"
+            "2️⃣ Ýene 5 habar ibermek\n"
+            "3️⃣ Täze adamlary goşmak\n\n"
+            "*Gurallar:*\n"
+            "• Ýalňyşlyklar sanawy\n"
+            "• \"Ýok\" jogabyna skript:\n"
+            "_\"Häzir amatly wagtyň däldigini düşünýärin. Diňe 5 minuta maglumat görkezsemdim?\"_\n\n"
+            "💡 Her \"ýok\" — \"hawa\"a ýakynlaşmak!\n\n"
+            "✅ Tabşyryklary ýerine ýetirdiňmi? 4-nji güne geç 👇"
+        ),
+        "uz": (
+            "🔄 *3-kun — Nazorat va masshtab*\n\n"
+            "*Vazifa:* harakatni mustahkamlash\n\n"
+            "*Bugungi vazifalar:*\n"
+            "1️⃣ Tahlil: nima bo'ldi, qayerda qo'rqdingi?\n"
+            "2️⃣ Yana 5 ta xabar yuborish\n"
+            "3️⃣ Yangi odamlarni qo'shish\n\n"
+            "*Vositalar:*\n"
+            "• Xatolar ro'yxati\n"
+            "• \"Yo'q\" javobiga skript:\n"
+            "_\"Tushunaman, hozir qulay vaqt emas. Shunchaki 5 daqiqada ma'lumot ko'rsatsam bo'ladimi?\"_\n\n"
+            "💡 Har bir \"yo'q\" — \"ha\"ga yaqinlashish!\n\n"
+            "✅ Vazifalarni bajardingmi? 4-kunga o'tish uchun bos 👇"
+        ),
+    },
+    4: {
+        "ru": (
+            "📊 *День 4 — Аналитика*\n\n"
+            "*Задача:* научить думать как предприниматель\n\n"
+            "*Твои задания сегодня:*\n"
+            "1️⃣ Посчитай: сколько написал / сколько ответили / сколько пришли\n"
+            "2️⃣ Пойми свою конверсию\n"
+            "3️⃣ Отправь мини-отчёт наставнику\n\n"
+            "📈 *Формула успеха:*\n"
+            "10 сообщений = 3 ответа = 1 встреча\n"
+            "Это нормально! Главное — объём.\n\n"
+            "💡 Не оценивай результат эмоциями — смотри на цифры!\n\n"
+            "✅ Сделал анализ? Нажми ниже чтобы перейти к Дню 5 👇"
+        ),
+        "tk": (
+            "📊 *4-nji gün — Analitika*\n\n"
+            "*Wezipe:* telekeçi ýaly pikirlenmegi öwrenmek\n\n"
+            "*Şu günki tabşyryklar:*\n"
+            "1️⃣ Sana: näçe ýazdyň / näçesi jogap berdi / näçesi geldi\n"
+            "2️⃣ Öz konwersiýaňy düşün\n"
+            "3️⃣ Halypanyňa mini-hasabat iber\n\n"
+            "📈 *Üstünlik formulasy:*\n"
+            "10 habar = 3 jogap = 1 duşuşyk\n"
+            "Bu kadaly! Esasy — mukdar.\n\n"
+            "💡 Netijäni duýgy bilen däl — sanlar bilen baha ber!\n\n"
+            "✅ Derňewi etdiňmi? 5-nji güne geçmek üçin bas 👇"
+        ),
+        "uz": (
+            "📊 *4-kun — Tahlil*\n\n"
+            "*Vazifa:* tadbirkor kabi fikrlashni o'rganish\n\n"
+            "*Bugungi vazifalar:*\n"
+            "1️⃣ Hisobla: nechta yozdim / nechtasi javob berdi / nechtasi keldi\n"
+            "2️⃣ O'z konversiyangni tushun\n"
+            "3️⃣ Murabbiyingga mini-hisobot yubor\n\n"
+            "📈 *Muvaffaqiyat formulasi:*\n"
+            "10 xabar = 3 javob = 1 uchrashuv\n"
+            "Bu normal! Asosiysi — hajm.\n\n"
+            "💡 Natijani his-tuyg'u bilan emas — raqamlar bilan baho ber!\n\n"
+            "✅ Tahlil qildingmi? 5-kunga o'tish uchun bos 👇"
+        ),
+    },
+    5: {
+        "ru": (
+            "🏆 *День 5 — Личный результат*\n\n"
+            "*Задача:* создать веру через первый результат\n\n"
+            "*Твои задания сегодня:*\n"
+            "1️⃣ Зафиксируй первый результат (продажа / регистрация / отзыв на продукт)\n"
+            "2️⃣ Напиши 5 людям:\n"
+            "_\"Я начал, уже есть первые результаты, давай покажу\"_\n\n"
+            "*Инструменты:*\n"
+            "• Скрипт \"результат\"\n"
+            "• Фото / скриншот / отзыв\n\n"
+            "💡 Люди верят людям, а не словам. Покажи результат!\n\n"
+            "✅ Есть первый результат? Нажми ниже чтобы перейти к Дню 6 👇"
+        ),
+        "tk": (
+            "🏆 *5-nji gün — Şahsy netije*\n\n"
+            "*Wezipe:* ilkinji netije arkaly ynamy döretmek\n\n"
+            "*Şu günki tabşyryklar:*\n"
+            "1️⃣ Ilkinji netijäni bellemek (satyş / hasaba alyş / önüm synlary)\n"
+            "2️⃣ 5 adama ýaz:\n"
+            "_\"Başladym, eýýäm ilkinji netijeler bar, görkezeýin\"_\n\n"
+            "*Gurallar:*\n"
+            "• \"Netije\" skripti\n"
+            "• Surat / ekran suraty / syn\n\n"
+            "💡 Adamlar adamlara ynanýar. Netijäni görkez!\n\n"
+            "✅ Ilkinji netije barmy? 6-njy güne geçmek üçin bas 👇"
+        ),
+        "uz": (
+            "🏆 *5-kun — Shaxsiy natija*\n\n"
+            "*Vazifa:* birinchi natija orqali ishonch yaratish\n\n"
+            "*Bugungi vazifalar:*\n"
+            "1️⃣ Birinchi natijani qayd et (sotuv / ro'yxat / mahsulot sharhi)\n"
+            "2️⃣ 5 kishiga yoz:\n"
+            "_\"Boshladim, allaqachon birinchi natijalar bor, ko'rsatay\"_\n\n"
+            "*Vositalar:*\n"
+            "• \"Natija\" skripti\n"
+            "• Rasm / skrinshot / sharh\n\n"
+            "💡 Odamlar odamlarga ishonadi. Natijani ko'rsat!\n\n"
+            "✅ Birinchi natija bormi? 6-kunga o'tish uchun bos 👇"
+        ),
+    },
+    6: {
+        "ru": (
+            "📈 *День 6 — Масштабирование*\n\n"
+            "*Задача:* выйти из зоны \"один на один\"\n\n"
+            "*Твои задания сегодня:*\n"
+            "1️⃣ Назначить минимум 2 встречи\n"
+            "2️⃣ Подключить наставника к встречам\n"
+            "3️⃣ Использовать Zoom / групповые встречи\n\n"
+            "*Инструменты:*\n"
+            "• Готовый Zoom\n"
+            "• Афиша встречи\n"
+            "• Ссылка на презентацию\n\n"
+            "💡 Один в поле не воин. Наставник умножает твои результаты!\n\n"
+            "✅ Провёл встречи с наставником? Нажми ниже чтобы перейти к Дню 7 👇"
+        ),
+        "tk": (
+            "📈 *6-njy gün — Masştablaşdyrmak*\n\n"
+            "*Wezipe:* \"biri-biri bilen\" zonasyndan çykmak\n\n"
+            "*Şu günki tabşyryklar:*\n"
+            "1️⃣ Azyndan 2 duşuşyk bellemek\n"
+            "2️⃣ Halypany duşuşyklara birikdirmek\n"
+            "3️⃣ Zoom / toparlaýyn duşuşyklar\n\n"
+            "*Gurallar:*\n"
+            "• Taýýar Zoom\n"
+            "• Duşuşyk afişasy\n"
+            "• Prezentasiýa baglanyşygy\n\n"
+            "💡 Bir adam sährada söweşiji däl. Halypa netijäňi artdyrýar!\n\n"
+            "✅ Halypa bilen duşuşyklary geçirdiňmi? 7-nji güne geç 👇"
+        ),
+        "uz": (
+            "📈 *6-kun — Masshtablash*\n\n"
+            "*Vazifa:* \"yakka-yakka\" zonasidan chiqish\n\n"
+            "*Bugungi vazifalar:*\n"
+            "1️⃣ Kamida 2 ta uchrashuv belgilash\n"
+            "2️⃣ Murabbiyni uchrashuvlarga ulash\n"
+            "3️⃣ Zoom / guruhli uchrashuvlar\n\n"
+            "*Vositalar:*\n"
+            "• Tayyor Zoom\n"
+            "• Uchrashuv afishasi\n"
+            "• Taqdimot havolasi\n\n"
+            "💡 Bitta odam dalada jangchi emas. Murabbiy natijangni ko'paytiradi!\n\n"
+            "✅ Murabbiy bilan uchrashuvlarni o'tkazdingmi? 7-kunga o'tish uchun bos 👇"
+        ),
+    },
+    7: {
+        "ru": (
+            "🎉 *День 7 — Фиксация результата!*\n\n"
+            "*Задача:* закрепить успех и мотивацию\n\n"
+            "*Твои задания сегодня:*\n"
+            "1️⃣ Запиши видео:\n"
+            "   • что сделал за 7 дней\n"
+            "   • что получилось\n"
+            "   • сколько заработал / людей подключил\n"
+            "2️⃣ Выложи в чат / соцсети\n\n"
+            "📹 *Скрипт для видео:*\n"
+            "_\"Я начал 7 дней назад… вот мой результат…\"_\n\n"
+            "🏆 Ты прошёл первые 7 дней! Это только начало.\n"
+            "Теперь повторяй цикл с удвоенной силой 💪\n\n"
+            "🌿 Свяжись с наставником для следующего шага!"
+        ),
+        "tk": (
+            "🎉 *7-nji gün — Netijäni berkitmek!*\n\n"
+            "*Wezipe:* üstünligi we höwesi berkitmek\n\n"
+            "*Şu günki tabşyryklar:*\n"
+            "1️⃣ Wideo ýaz:\n"
+            "   • 7 günde näme etdiň\n"
+            "   • näme alyndy\n"
+            "   • näçe gazandyň / näçe adam birikdirdiň\n"
+            "2️⃣ Çata / sosial ulgamlara goý\n\n"
+            "📹 *Wideo üçin skript:*\n"
+            "_\"Men 7 gün ozal başladym… ine meniň netijem…\"_\n\n"
+            "🏆 Ilkinji 7 günden geçdiň! Bu diňe başlangyç.\n"
+            "Indi güýç bilen gaýtala 💪\n\n"
+            "🌿 Indiki ädim üçin halypaň bilen habarlaş!"
+        ),
+        "uz": (
+            "🎉 *7-kun — Natijani mustahkamlash!*\n\n"
+            "*Vazifa:* muvaffaqiyat va motivatsiyani mustahkamlash\n\n"
+            "*Bugungi vazifalar:*\n"
+            "1️⃣ Video yoz:\n"
+            "   • 7 kunda nima qilding\n"
+            "   • nima natija olding\n"
+            "   • qancha ishladim / necha kishi ulanding\n"
+            "2️⃣ Chat / ijtimoiy tarmoqlarga joylashtir\n\n"
+            "📹 *Video uchun skript:*\n"
+            "_\"Men 7 kun oldin boshladim… mana mening natijam…\"_\n\n"
+            "🏆 Birinchi 7 kunni o'tdingiz! Bu faqat boshlanish.\n"
+            "Endi ikki karra kuch bilan takrorla 💪\n\n"
+            "🌿 Keyingi qadam uchun murabbiy bilan bog'lan!"
+        ),
+    },
+}
+
+DAYS_DONE_BTN = {
+    "ru": "✅ Задание выполнено! Перейти дальше",
+    "tk": "✅ Tabşyryk ýerine ýetirildi! Dowam et",
+    "uz": "✅ Vazifa bajarildi! Davom etish",
+}
+DAYS_REPEAT_BTN = {
+    "ru": "🔁 Повторить задание дня",
+    "tk": "🔁 Günüň tabşyrygyny gaýtala",
+    "uz": "🔁 Kun vazifasini takrorla",
+}
+DAYS_ALL_DONE = {
+    "ru": "🏆 Вы прошли все 7 дней обучения! Продолжайте в том же духе 💪",
+    "tk": "🏆 Siz 7 günlük okuwdan geçdiňiz! Şol ruhy bilen dowam ediň 💪",
+    "uz": "🏆 Siz 7 kunlik o'qitishni tugatdingiz! Shu ruhda davom eting 💪",
+}
+
 LEARN_FULL = {
     "ru": (
         "📚 *Обучение партнёра*\n\n"
@@ -1296,17 +1682,84 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         return CHAT
 
-    # Обучение — с предложением вебинара
+    # Обучение — показываем текущий день
     if text == p["btn_learn"]:
+        day = progress_get(user.id)
+        if day == 0:
+            # Первый вход — запускаем День 1
+            progress_set(user.id, 1)
+            await progress_sync_to_sheets(user.id, 1, user.full_name or "", f"@{user.username}" if user.username else str(user.id))
+            day = 1
+        if day > 7:
+            await update.message.reply_text(DAYS_ALL_DONE.get(lang, DAYS_ALL_DONE["ru"]), reply_markup=get_partner_kb(lang))
+            return PARTNER_MENU
+        day_text = DAYS[day].get(lang, DAYS[day]["ru"])
+        done_btn = DAYS_DONE_BTN.get(lang, DAYS_DONE_BTN["ru"])
+        repeat_btn = DAYS_REPEAT_BTN.get(lang, DAYS_REPEAT_BTN["ru"])
         learn_kb = ReplyKeyboardMarkup(
-            [[p["btn_webinar"]], [p["btn_back"]]],
+            [[done_btn], [p["btn_webinar"]], [repeat_btn], [p["btn_back"]]],
             resize_keyboard=True
         )
-        await update.message.reply_text(
-            LEARN_FULL.get(lang, LEARN_FULL["ru"]),
-            parse_mode="Markdown",
-            reply_markup=learn_kb
+        await update.message.reply_text(day_text, parse_mode="Markdown", reply_markup=learn_kb)
+        return PARTNER_MENU
+
+    # Кнопка "Задание выполнено"
+    done_btns = list(DAYS_DONE_BTN.values())
+    if text in done_btns:
+        day = progress_get(user.id)
+        if day >= 7:
+            progress_set(user.id, 8)
+            await progress_sync_to_sheets(user.id, 8, user.full_name or "", f"@{user.username}" if user.username else str(user.id))
+            await update.message.reply_text(DAYS_ALL_DONE.get(lang, DAYS_ALL_DONE["ru"]), reply_markup=get_partner_kb(lang))
+            return PARTNER_MENU
+        new_day = day + 1
+        progress_set(user.id, new_day)
+        await progress_sync_to_sheets(user.id, new_day, user.full_name or "", f"@{user.username}" if user.username else str(user.id))
+        # Уведомляем менеджера
+        uname = f"@{user.username}" if user.username else str(user.id)
+        try:
+            await context.bot.send_message(
+                chat_id=MANAGER_CHAT_ID,
+                text=f"✅ Партнёр завершил День {day}\n\n👤 {user.full_name or uname}\n🆔 {uname}\n➡️ Переходит к Дню {new_day}"
+            )
+        except Exception as e:
+            logger.error(f"progress notify: {e}")
+        if new_day > 7:
+            await update.message.reply_text(DAYS_ALL_DONE.get(lang, DAYS_ALL_DONE["ru"]), reply_markup=get_partner_kb(lang))
+        else:
+            day_text = DAYS[new_day].get(lang, DAYS[new_day]["ru"])
+            done_btn = DAYS_DONE_BTN.get(lang, DAYS_DONE_BTN["ru"])
+            repeat_btn = DAYS_REPEAT_BTN.get(lang, DAYS_REPEAT_BTN["ru"])
+            learn_kb = ReplyKeyboardMarkup(
+                [[done_btn], [p["btn_webinar"]], [repeat_btn], [p["btn_back"]]],
+                resize_keyboard=True
+            )
+            congrats = {
+                "ru": f"🎉 День {day} пройден! Открывается День {new_day}:",
+                "tk": f"🎉 {day}-nji gün geçildi! {new_day}-nji gün açylýar:",
+                "uz": f"🎉 {day}-kun o'tildi! {new_day}-kun ochilmoqda:",
+            }
+            await update.message.reply_text(congrats.get(lang, congrats["ru"]), reply_markup=learn_kb)
+            await update.message.reply_text(day_text, parse_mode="Markdown", reply_markup=learn_kb)
+        return PARTNER_MENU
+
+    # Кнопка "Повторить задание дня"
+    repeat_btns = list(DAYS_REPEAT_BTN.values())
+    if text in repeat_btns:
+        day = progress_get(user.id)
+        if day == 0:
+            day = 1
+        if day > 7:
+            await update.message.reply_text(DAYS_ALL_DONE.get(lang, DAYS_ALL_DONE["ru"]), reply_markup=get_partner_kb(lang))
+            return PARTNER_MENU
+        day_text = DAYS[day].get(lang, DAYS[day]["ru"])
+        done_btn = DAYS_DONE_BTN.get(lang, DAYS_DONE_BTN["ru"])
+        repeat_btn = DAYS_REPEAT_BTN.get(lang, DAYS_REPEAT_BTN["ru"])
+        learn_kb = ReplyKeyboardMarkup(
+            [[done_btn], [p["btn_webinar"]], [repeat_btn], [p["btn_back"]]],
+            resize_keyboard=True
         )
+        await update.message.reply_text(day_text, parse_mode="Markdown", reply_markup=learn_kb)
         return PARTNER_MENU
 
     # Маркетинг — с PV и товарооборотом
@@ -1686,7 +2139,7 @@ async def admin_circle_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
 # ─── main ─────────────────────────────────────────────────────
 def main():
-    app = Application.builder().token(BOT_TOKEN).post_init(load_partners_from_sheets).build()
+    app = Application.builder().token(BOT_TOKEN).post_init(_load_partners_impl).build()
 
     conv = ConversationHandler(
         entry_points=[
