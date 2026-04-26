@@ -38,6 +38,7 @@ _CONTACTS_F  = pathlib.Path("/tmp/vrt_contacts.json")
 _WEBINAR_F   = pathlib.Path("/tmp/vrt_webinar.json")
 _NEWS_F      = pathlib.Path("/tmp/vrt_news.json")
 _PROGRESS_F  = pathlib.Path("/tmp/vrt_progress.json")
+_USERS_F     = pathlib.Path("/tmp/vrt_users.json")
 
 def _jload(p):
     try:
@@ -76,6 +77,54 @@ def pending_del(uid):
     d = _jload(_PENDING_F);  d.pop(str(uid), None);                              _jsave(_PENDING_F,  d)
 def contacts_get(uid):       return _jload(_CONTACTS_F).get(str(uid), [])
 # ─── Прогресс 7 дней ─────────────────────────────────────────
+
+def user_register(uid: int, lang: str, country: str, name: str, uname: str):
+    """Регистрирует пользователя при первом старте бота."""
+    d = _jload(_USERS_F)
+    if str(uid) not in d:
+        d[str(uid)] = {"lang": lang, "country": country, "name": name, "uname": uname}
+        _jsave(_USERS_F, d)
+
+def users_get_all() -> dict:
+    return _jload(_USERS_F)
+
+async def user_register_sheets(uid: int, lang: str, country: str, name: str, uname: str):
+    """Сохраняет нового пользователя в Google Sheets."""
+    try:
+        async with httpx.AsyncClient(follow_redirects=True) as c:
+            await c.post(GOOGLE_SHEET_URL, json={
+                "type":    "user",
+                "user_id": str(uid),
+                "lang":    lang,
+                "country": country,
+                "name":    name,
+                "username": uname,
+            }, timeout=10)
+    except Exception as e:
+        logger.error(f"user_register_sheets: {e}")
+
+async def users_load_from_sheets():
+    """Загружает всех пользователей из Sheets при старте."""
+    try:
+        async with httpx.AsyncClient(follow_redirects=True) as c:
+            resp = await c.post(GOOGLE_SHEET_URL,
+                                json={"type": "get_users"}, timeout=15)
+            data = resp.json()
+            if data.get("status") == "ok" and data.get("users"):
+                d = _jload(_USERS_F)
+                for u in data["users"]:
+                    uid = str(u.get("user_id","")).strip()
+                    if uid:
+                        d[uid] = {
+                            "lang":    u.get("lang","ru"),
+                            "country": u.get("country","TKM"),
+                            "name":    u.get("name",""),
+                            "uname":   u.get("username",""),
+                        }
+                _jsave(_USERS_F, d)
+                logger.info(f"✅ Загружено {len(data['users'])} пользователей из Sheets")
+    except Exception as e:
+        logger.error(f"users_load_from_sheets: {e}")
 
 def progress_get(uid: int) -> int:
     """Возвращает текущий день партнёра (0 = не начал, 1-7 = день)."""
@@ -743,6 +792,7 @@ async def _load_partners_impl(app=None):
     except Exception as e:
         logger.error(f"load_partners error: {e}")
     await progress_load_from_sheets()
+    await users_load_from_sheets()
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
@@ -793,6 +843,10 @@ async def select_lang(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["lang"] = lang
     user = update.effective_user
     user_histories[user.id] = []
+    # Регистрируем пользователя в общей базе
+    uname_r = f"@{user.username}" if user.username else str(user.id)
+    user_register(user.id, lang, country, user.full_name or uname_r, uname_r)
+    await user_register_sheets(user.id, lang, country, user.full_name or uname_r, uname_r)
 
     t = TEXTS[lang]
     await update.message.reply_text(
@@ -1968,7 +2022,8 @@ def schedule_partner_reminders(context, uid: int, lang: str):
 ADMIN_KB = ReplyKeyboardMarkup(
     [["👥 Список партнёров",  "📋 Заявки на вебинар"],
      ["📰 Добавить новость",  "🎥 Отправить кружок"],
-     ["📣 Рассылка партнёрам","🔙 Выход из админ-меню"]],
+     ["📣 Рассылка партнёрам","📢 Пост всем пользователям"],
+     ["🔙 Выход из админ-меню"]],
     resize_keyboard=True
 )
 
@@ -2107,6 +2162,44 @@ async def admin_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "🎥 Отправьте видео-кружок — я перешлю всем партнёрам:",
             reply_markup=ReplyKeyboardRemove()
+        )
+        return ADMIN_MENU
+
+    # Пост всем пользователям бота
+    if text == "📢 Пост всем пользователям":
+        context.user_data["admin_post_all"] = True
+        all_users = users_get_all()
+        partners  = _jload(_PARTNERS_F)
+        total = len(all_users)
+        await update.message.reply_text(
+            f"📢 Введите текст поста.\n\n"
+            f"Он будет отправлен *всем* пользователям бота: {total} чел.\n"
+            f"(из них партнёров: {len(partners)})\n\n"
+            f"Можно использовать *жирный* и _курсив_ (Markdown):",
+            parse_mode="Markdown",
+            reply_markup=ReplyKeyboardRemove()
+        )
+        return ADMIN_MENU
+
+    if context.user_data.pop("admin_post_all", False):
+        all_users = users_get_all()
+        sent = failed = 0
+        for uid in all_users:
+            try:
+                await context.bot.send_message(
+                    chat_id=int(uid),
+                    text=text,
+                    parse_mode="Markdown"
+                )
+                sent += 1
+            except Exception:
+                failed += 1
+        await update.message.reply_text(
+            f"✅ Пост отправлен!\n\n"
+            f"📤 Доставлено: {sent}\n"
+            f"❌ Ошибок: {failed}\n"
+            f"📊 Всего: {sent + failed}",
+            reply_markup=ADMIN_KB
         )
         return ADMIN_MENU
 
