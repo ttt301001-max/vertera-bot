@@ -36,6 +36,7 @@ _PARTNERS_F  = pathlib.Path("/tmp/vrt_partners.json")
 _PENDING_F   = pathlib.Path("/tmp/vrt_pending.json")
 _CONTACTS_F  = pathlib.Path("/tmp/vrt_contacts.json")
 _WEBINAR_F   = pathlib.Path("/tmp/vrt_webinar.json")
+_NEWS_F      = pathlib.Path("/tmp/vrt_news.json")
 
 def _jload(p):
     try:
@@ -73,6 +74,22 @@ def pending_get(uid):        return _jload(_PENDING_F).get(str(uid), {})
 def pending_del(uid):
     d = _jload(_PENDING_F);  d.pop(str(uid), None);                              _jsave(_PENDING_F,  d)
 def contacts_get(uid):       return _jload(_CONTACTS_F).get(str(uid), [])
+def news_save(text: str):
+    """Сохраняет новость."""
+    import datetime
+    d = _jload(_NEWS_F)
+    lst = d.get("list", [])
+    lst.insert(0, {"text": text, "date": datetime.datetime.now().strftime("%d.%m.%Y %H:%M")})
+    d["list"] = lst[:50]  # храним последние 50
+    _jsave(_NEWS_F, d)
+
+def news_get_latest() -> str:
+    """Возвращает последнюю новость или пустую строку."""
+    lst = _jload(_NEWS_F).get("list", [])
+    if not lst:
+        return ""
+    return f"📅 {lst[0]['date']}\n\n{lst[0]['text']}"
+
 def webinar_add(uid, name, text, uname):
     d = _jload(_WEBINAR_F)
     lst = d.get("list", [])
@@ -1355,9 +1372,17 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_text(p["c_name"], parse_mode="Markdown", reply_markup=ReplyKeyboardRemove())
         return PARTNER_CONTACTS_NAME
 
-    # Новости
+    # Новости — показываем последнюю из хранилища
     if text == p["btn_news"]:
-        await update.message.reply_text(p["news"], reply_markup=get_partner_kb(lang))
+        latest = news_get_latest()
+        if latest:
+            await update.message.reply_text(
+                f"📰 *Последняя новость:*\n\n{latest}",
+                parse_mode="Markdown",
+                reply_markup=get_partner_kb(lang)
+            )
+        else:
+            await update.message.reply_text(p["news"], reply_markup=get_partner_kb(lang))
         return PARTNER_MENU
 
     # Любой другой текст — остаёмся в меню
@@ -1484,8 +1509,8 @@ def schedule_partner_reminders(context, uid: int, lang: str):
 
 ADMIN_KB = ReplyKeyboardMarkup(
     [["👥 Список партнёров",  "📋 Заявки на вебинар"],
-     ["📣 Рассылка партнёрам","🎥 Отправить кружок"],
-     ["🔙 Выход из админ-меню"]],
+     ["📰 Добавить новость",  "🎥 Отправить кружок"],
+     ["📣 Рассылка партнёрам","🔙 Выход из админ-меню"]],
     resize_keyboard=True
 )
 
@@ -1557,6 +1582,37 @@ async def admin_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text(chunk, reply_markup=ADMIN_KB)
         else:
             await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=ADMIN_KB)
+        return ADMIN_MENU
+
+    # Новость — сохраняем и сразу отправляем всем партнёрам
+    if text == "📰 Добавить новость":
+        context.user_data["admin_news"] = True
+        await update.message.reply_text(
+            "📰 Введите текст новости — она сохранится и сразу придёт всем партнёрам:",
+            reply_markup=ReplyKeyboardRemove()
+        )
+        return ADMIN_MENU
+
+    if context.user_data.pop("admin_news", False):
+        news_save(text)
+        partners = _jload(_PARTNERS_F)
+        sent = failed = 0
+        for uid, info in partners.items():
+            lang_p = info.get("lang", "ru")
+            header = {"ru": "📰 *Новости Vertera:*", "tk": "📰 *Vertera habarlary:*", "uz": "📰 *Vertera yangiliklari:*"}.get(lang_p, "📰 *Новости Vertera:*")
+            try:
+                await context.bot.send_message(
+                    chat_id=int(uid),
+                    text=f"{header}\n\n{text}",
+                    parse_mode="Markdown"
+                )
+                sent += 1
+            except Exception:
+                failed += 1
+        await update.message.reply_text(
+            f"✅ Новость опубликована! Отправлено: {sent} партнёрам | Ошибок: {failed}",
+            reply_markup=ADMIN_KB
+        )
         return ADMIN_MENU
 
     # Рассылка
