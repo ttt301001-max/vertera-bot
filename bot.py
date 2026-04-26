@@ -665,10 +665,11 @@ def get_phone(country: str) -> str:
 async def load_partners_from_sheets(app=None):
     """Загружает партнёров из Google Sheets в локальный кэш при старте."""
     try:
-        async with httpx.AsyncClient() as c:
-            resp = await c.get(
+        # Используем POST с type=get_partners (обходим проблему с GET/403)
+        async with httpx.AsyncClient(follow_redirects=True) as c:
+            resp = await c.post(
                 GOOGLE_SHEET_URL,
-                params={"action": "get_partners"},
+                json={"type": "get_partners"},
                 timeout=15
             )
             data = resp.json()
@@ -687,7 +688,7 @@ async def load_partners_from_sheets(app=None):
                 _jsave(_PARTNERS_F, existing)
                 logger.info(f"✅ Загружено {count} партнёров из Google Sheets")
             else:
-                logger.info(f"Google Sheets ответил: {data}")
+                logger.info(f"Sheets ответил: {data}")
     except Exception as e:
         logger.error(f"load_partners_from_sheets error: {e}")
 
@@ -1685,7 +1686,7 @@ async def admin_circle_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
 # ─── main ─────────────────────────────────────────────────────
 def main():
-    app = Application.builder().token(BOT_TOKEN).build()
+    app = Application.builder().token(BOT_TOKEN).post_init(load_partners_from_sheets).build()
 
     conv = ConversationHandler(
         entry_points=[
@@ -1717,9 +1718,6 @@ def main():
     # /apXXXXX и /rjXXXXX — одобрение/отклонение вне ConversationHandler
     app.add_handler(MessageHandler(filters.Regex(r"^/ap[0-9]+$"), partner_approve))
     app.add_handler(MessageHandler(filters.Regex(r"^/rj[0-9]+$"), partner_reject))
-
-    # post_init вызывается PTB после инициализации, в правильном event loop
-    app.post_init = load_partners_from_sheets
 
     logger.info("🤖 Vertera bot started!")
     app.run_polling(drop_pending_updates=True)
