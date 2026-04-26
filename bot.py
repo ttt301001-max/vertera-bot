@@ -662,30 +662,34 @@ def get_phone(country: str) -> str:
     return SPONSOR_PHONE_TKM if country == "TKM" else SPONSOR_PHONE_UZB
 
 # ─── /start — выбор страны ───────────────────────────────────
-async def load_partners_from_sheets():
+async def load_partners_from_sheets(app=None):
     """Загружает партнёров из Google Sheets в локальный кэш при старте."""
     try:
         async with httpx.AsyncClient() as c:
             resp = await c.get(
                 GOOGLE_SHEET_URL,
                 params={"action": "get_partners"},
-                timeout=10
+                timeout=15
             )
             data = resp.json()
             if data.get("status") == "ok" and data.get("partners"):
                 existing = _jload(_PARTNERS_F)
+                count = 0
                 for p in data["partners"]:
-                    uid = str(p.get("user_id", ""))
-                    if uid and uid not in existing:
+                    uid = str(p.get("user_id", "")).strip()
+                    if uid:
                         existing[uid] = {
                             "name": p.get("name", ""),
                             "cid":  p.get("company_id", ""),
                             "lang": p.get("lang", "ru"),
                         }
+                        count += 1
                 _jsave(_PARTNERS_F, existing)
-                logger.info(f"Loaded {len(data['partners'])} partners from Sheets")
+                logger.info(f"✅ Загружено {count} партнёров из Google Sheets")
+            else:
+                logger.info(f"Google Sheets ответил: {data}")
     except Exception as e:
-        logger.error(f"load_partners_from_sheets: {e}")
+        logger.error(f"load_partners_from_sheets error: {e}")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
@@ -1714,12 +1718,10 @@ def main():
     app.add_handler(MessageHandler(filters.Regex(r"^/ap[0-9]+$"), partner_approve))
     app.add_handler(MessageHandler(filters.Regex(r"^/rj[0-9]+$"), partner_reject))
 
+    # post_init вызывается PTB после инициализации, в правильном event loop
+    app.post_init = load_partners_from_sheets
+
     logger.info("🤖 Vertera bot started!")
-
-    # Загружаем партнёров из Google Sheets при старте
-    import asyncio
-    asyncio.get_event_loop().run_until_complete(load_partners_from_sheets())
-
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
