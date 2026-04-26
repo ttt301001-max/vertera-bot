@@ -25,7 +25,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ─── Состояния ───────────────────────────────────────────────
-SELECT_COUNTRY, SELECT_LANG, CHAT, ANKETA_NAME, ANKETA_PHONE, ANKETA_CITY, ANKETA_INTEREST, PARTNER_ID, PARTNER_MENU, PARTNER_CONTACTS_NAME, PARTNER_CONTACTS_PHONE = range(11)
+SELECT_COUNTRY, SELECT_LANG, CHAT, ANKETA_NAME, ANKETA_PHONE, ANKETA_CITY, ANKETA_INTEREST, PARTNER_ID, PARTNER_MENU, PARTNER_CONTACTS_NAME, PARTNER_CONTACTS_PHONE, ADMIN_MENU = range(12)
 
 user_histories = {}
 
@@ -51,6 +51,21 @@ def _jsave(p, d):
 def is_partner(uid):        return str(uid) in _jload(_PARTNERS_F)
 def partner_add(uid, name, cid, lang):
     d = _jload(_PARTNERS_F); d[str(uid)] = {"name":name,"cid":cid,"lang":lang}; _jsave(_PARTNERS_F, d)
+
+async def partner_add_sheets(uid, name, cid, lang, uname, bot_instance=None):
+    """Сохраняет партнёра в Google Sheets для постоянного хранения."""
+    try:
+        async with httpx.AsyncClient() as c:
+            await c.post(GOOGLE_SHEET_URL, json={
+                "type": "partner",
+                "user_id": str(uid),
+                "name": name,
+                "company_id": cid,
+                "lang": lang,
+                "username": uname,
+            }, timeout=10)
+    except Exception as e:
+        logger.error(f"partner_add_sheets: {e}")
 def pending_add(uid, info):
     d = _jload(_PENDING_F);  d[str(uid)] = info;                                 _jsave(_PENDING_F,  d)
 def pending_get(uid):        return _jload(_PENDING_F).get(str(uid), {})
@@ -1326,8 +1341,11 @@ async def partner_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Запрос не найден."); return
     partner_add(uid, info.get("name",""), info.get("cid",""), info.get("lang","ru"))
     pending_del(uid)
-    lang = info.get("lang","ru")
-    p    = PT.get(lang, PT["ru"])
+    lang  = info.get("lang","ru")
+    uname = info.get("uname","")
+    p     = PT.get(lang, PT["ru"])
+    # Сохраняем в Google Sheets (постоянное хранение)
+    await partner_add_sheets(uid, info.get("name",""), info.get("cid",""), lang, uname)
     try:
         await context.bot.send_message(
             chat_id=uid, text=p["approved"],
@@ -1424,39 +1442,51 @@ async def admin_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown",
         reply_markup=ADMIN_KB
     )
+    return ADMIN_MENU
 
 async def admin_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обрабатывает кнопки admin-меню (только для менеджера)."""
     if update.effective_user.id != MANAGER_CHAT_ID:
-        return
+        await update.message.reply_text(
+            TEXTS[context.user_data.get("lang","ru")]["welcome"],
+            parse_mode="Markdown",
+            reply_markup=get_main_keyboard(context.user_data.get("lang","ru"))
+        )
+        return CHAT
     text = update.message.text
 
     if text == "🔙 Выход из админ-меню":
-        await update.message.reply_text("Вышли из меню.", reply_markup=ReplyKeyboardRemove())
-        return
+        await update.message.reply_text(
+            "Вышли из меню администратора.",
+            reply_markup=ReplyKeyboardRemove()
+        )
+        return CHAT
 
     # Список одобренных партнёров
     if text == "👥 Список партнёров":
         partners = _jload(_PARTNERS_F)
         if not partners:
             await update.message.reply_text("Партнёров пока нет.", reply_markup=ADMIN_KB)
-            return
+            return ADMIN_MENU
         lines = []
         for uid, info in partners.items():
-            lines.append(f"• {info.get('name','—')} | ID Vertera: {info.get('cid','—')} | lang: {info.get('lang','—')} | tg: {uid}")
-        await update.message.reply_text(
-            f"👥 *Партнёры ({len(lines)}):*\n\n" + "\n".join(lines),
-            parse_mode="Markdown",
-            reply_markup=ADMIN_KB
-        )
-        return
+            lines.append(f"• {info.get('name','—')} | ID: {info.get('cid','—')} | {info.get('lang','—')} | tg: {uid}")
+        msg = f"👥 *Партнёры ({len(lines)}):*\n\n" + "\n".join(lines)
+        # Разбиваем если длинный
+        if len(msg) > 3500:
+            chunks = [lines[i:i+20] for i in range(0, len(lines), 20)]
+            for chunk in chunks:
+                await update.message.reply_text("\n".join(chunk), reply_markup=ADMIN_KB)
+        else:
+            await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=ADMIN_KB)
+        return ADMIN_MENU
 
-    # Заявки на вебинар (pending)
+    # Заявки на вебинар
     if text == "📋 Заявки на вебинар":
         pending = _jload(_PENDING_F)
         if not pending:
-            await update.message.reply_text("Заявок на вебинар нет.", reply_markup=ADMIN_KB)
-            return
+            await update.message.reply_text("Заявок пока нет.", reply_markup=ADMIN_KB)
+            return ADMIN_MENU
         lines = []
         for uid, info in pending.items():
             lines.append(f"• {info.get('name','—')} | {info.get('uname','—')} | ID: {info.get('cid','—')}")
@@ -1465,42 +1495,47 @@ async def admin_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown",
             reply_markup=ADMIN_KB
         )
-        return
+        return ADMIN_MENU
 
-    # Рассылка всем партнёрам
+    # Рассылка
     if text == "📣 Рассылка партнёрам":
         context.user_data["admin_broadcast"] = True
         await update.message.reply_text(
-            "Введите текст рассылки (он будет отправлен всем партнёрам):",
+            "✏️ Введите текст рассылки — он уйдёт всем партнёрам:",
             reply_markup=ReplyKeyboardRemove()
         )
-        return
+        return ADMIN_MENU
 
     if context.user_data.pop("admin_broadcast", False):
         partners = _jload(_PARTNERS_F)
-        sent, failed = 0, 0
+        sent = failed = 0
         for uid in partners:
             try:
-                await context.bot.send_message(chat_id=int(uid), text=f"📣 *Сообщение от команды Vertera:*\n\n{text}", parse_mode="Markdown")
+                await context.bot.send_message(
+                    chat_id=int(uid),
+                    text=f"📣 *Сообщение от команды Vertera:*\n\n{text}",
+                    parse_mode="Markdown"
+                )
                 sent += 1
             except Exception:
                 failed += 1
         await update.message.reply_text(
-            f"✅ Рассылка завершена!\nОтправлено: {sent} | Ошибок: {failed}",
+            f"✅ Рассылка завершена! Отправлено: {sent} | Ошибок: {failed}",
             reply_markup=ADMIN_KB
         )
-        return
+        return ADMIN_MENU
 
-    # Отправить кружок (видео-заметку) — просим переслать
+    # Кружок
     if text == "🎥 Отправить кружок":
         context.user_data["admin_circle"] = True
         await update.message.reply_text(
-            "Отправьте видео-кружок (video_note) — я перешлю его всем партнёрам:",
+            "🎥 Отправьте видео-кружок — я перешлю всем партнёрам:",
             reply_markup=ReplyKeyboardRemove()
         )
-        return
+        return ADMIN_MENU
 
-    await update.message.reply_text("Выберите действие:", reply_markup=ADMIN_KB)
+    await update.message.reply_text("Выберите действие из меню:", reply_markup=ADMIN_KB)
+    return ADMIN_MENU
 
 async def admin_circle_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Получаем кружок от admin и рассылаем партнёрам."""
@@ -1521,16 +1556,20 @@ async def admin_circle_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         except Exception:
             failed += 1
     await update.message.reply_text(
-        f"✅ Кружок отправлен!\nОтправлено: {sent} | Ошибок: {failed}",
+        f"✅ Кружок отправлен! Отправлено: {sent} | Ошибок: {failed}",
         reply_markup=ADMIN_KB
     )
+    return ADMIN_MENU
 
 # ─── main ─────────────────────────────────────────────────────
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
     conv = ConversationHandler(
-        entry_points=[CommandHandler("start", start)],
+        entry_points=[
+            CommandHandler("start", start),
+            CommandHandler("admin", admin_cmd),
+        ],
         states={
             SELECT_COUNTRY:        [MessageHandler(filters.TEXT & ~filters.COMMAND, select_country)],
             SELECT_LANG:           [MessageHandler(filters.TEXT & ~filters.COMMAND, select_lang)],
@@ -1543,28 +1582,20 @@ def main():
             ANKETA_PHONE:          [MessageHandler(filters.TEXT & ~filters.COMMAND, anketa_phone)],
             ANKETA_CITY:           [MessageHandler(filters.TEXT & ~filters.COMMAND, anketa_city)],
             ANKETA_INTEREST:       [MessageHandler(filters.TEXT & ~filters.COMMAND, anketa_interest)],
+            ADMIN_MENU:            [
+                MessageHandler(filters.VIDEO_NOTE, admin_circle_handler),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_handler),
+            ],
         },
         fallbacks=[CommandHandler("start", start)],
         allow_reentry=True
     )
     app.add_handler(conv)
 
-    # /apXXXXX и /rjXXXXX — одобрение/отклонение партнёра
-    app.add_handler(MessageHandler(filters.Regex(r"^/ap\d+$"), partner_approve))
-    app.add_handler(MessageHandler(filters.Regex(r"^/rj\d+$"), partner_reject))
+    # /apXXXXX и /rjXXXXX — одобрение/отклонение вне ConversationHandler
+    app.add_handler(MessageHandler(filters.Regex(r"^/ap[0-9]+$"), partner_approve))
+    app.add_handler(MessageHandler(filters.Regex(r"^/rj[0-9]+$"), partner_reject))
 
-    # Админ меню
-    app.add_handler(CommandHandler("admin", admin_cmd))
-    app.add_handler(MessageHandler(
-        filters.TEXT & filters.Regex(r"^(👥 Список партнёров|📋 Заявки на вебинар|📣 Рассылка партнёрам|🎥 Отправить кружок|🔙 Выход из админ-меню)"),
-        admin_handler
-    ))
-    app.add_handler(MessageHandler(filters.VIDEO_NOTE, admin_circle_handler))
-    # Рассылка и кружок — произвольный текст/видео от admin
-    app.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND,
-        admin_handler
-    ))
     logger.info("🤖 Vertera bot started!")
     app.run_polling(drop_pending_updates=True)
 
