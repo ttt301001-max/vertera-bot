@@ -2172,10 +2172,11 @@ async def admin_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         partners  = _jload(_PARTNERS_F)
         total = len(all_users)
         await update.message.reply_text(
-            f"📢 Введите текст поста.\n\n"
-            f"Он будет отправлен *всем* пользователям бота: {total} чел.\n"
-            f"(из них партнёров: {len(partners)})\n\n"
-            f"Можно использовать *жирный* и _курсив_ (Markdown):",
+            f"📢 *Пост всем пользователям* ({total} чел., партнёров: {len(partners)})\n\n"
+            f"Отправьте:\n"
+            f"• *Текст* — просто напишите сообщение (поддерживается Markdown)\n"
+            f"• *Фото с подписью* — прикрепите картинку и добавьте текст в подписи\n"
+            f"• *Фото без текста* — просто отправьте картинку",
             parse_mode="Markdown",
             reply_markup=ReplyKeyboardRemove()
         )
@@ -2204,6 +2205,43 @@ async def admin_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ADMIN_MENU
 
     await update.message.reply_text("Выберите действие из меню:", reply_markup=ADMIN_KB)
+    return ADMIN_MENU
+
+async def admin_photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Получаем фото от admin и рассылаем всем пользователям или партнёрам."""
+    if update.effective_user.id != MANAGER_CHAT_ID:
+        return
+    if not context.user_data.get("admin_post_all") and not context.user_data.get("admin_broadcast"):
+        return
+
+    is_all = context.user_data.pop("admin_post_all", False)
+    context.user_data.pop("admin_broadcast", False)
+
+    photo   = update.message.photo[-1]  # берём максимальное разрешение
+    file_id = photo.file_id
+    caption = update.message.caption or ""
+
+    recipients = users_get_all() if is_all else _jload(_PARTNERS_F)
+    sent = failed = 0
+    for uid in recipients:
+        try:
+            await context.bot.send_photo(
+                chat_id=int(uid),
+                photo=file_id,
+                caption=caption,
+                parse_mode="Markdown"
+            )
+            sent += 1
+        except Exception:
+            failed += 1
+
+    label = "всем пользователям" if is_all else "партнёрам"
+    await update.message.reply_text(
+        f"✅ Пост с фото отправлен {label}!\n\n"
+        f"📤 Доставлено: {sent}\n"
+        f"❌ Ошибок: {failed}",
+        reply_markup=ADMIN_KB
+    )
     return ADMIN_MENU
 
 async def admin_circle_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2252,6 +2290,7 @@ def main():
             ANKETA_CITY:           [MessageHandler(filters.TEXT & ~filters.COMMAND, anketa_city)],
             ANKETA_INTEREST:       [MessageHandler(filters.TEXT & ~filters.COMMAND, anketa_interest)],
             ADMIN_MENU:            [
+                MessageHandler(filters.PHOTO, admin_photo_handler),
                 MessageHandler(filters.VIDEO_NOTE, admin_circle_handler),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, admin_handler),
             ],
