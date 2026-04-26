@@ -35,6 +35,7 @@ import json, pathlib
 _PARTNERS_F  = pathlib.Path("/tmp/vrt_partners.json")
 _PENDING_F   = pathlib.Path("/tmp/vrt_pending.json")
 _CONTACTS_F  = pathlib.Path("/tmp/vrt_contacts.json")
+_WEBINAR_F   = pathlib.Path("/tmp/vrt_webinar.json")
 
 def _jload(p):
     try:
@@ -72,6 +73,17 @@ def pending_get(uid):        return _jload(_PENDING_F).get(str(uid), {})
 def pending_del(uid):
     d = _jload(_PENDING_F);  d.pop(str(uid), None);                              _jsave(_PENDING_F,  d)
 def contacts_get(uid):       return _jload(_CONTACTS_F).get(str(uid), [])
+def webinar_add(uid, name, text, uname):
+    d = _jload(_WEBINAR_F)
+    lst = d.get("list", [])
+    lst.append({"uid": str(uid), "name": name, "text": text, "uname": uname,
+                "date": __import__("datetime").datetime.now().strftime("%d.%m.%Y %H:%M")})
+    d["list"] = lst
+    _jsave(_WEBINAR_F, d)
+
+def webinar_get_all():
+    return _jload(_WEBINAR_F).get("list", [])
+
 def contact_add(uid, name, phone):
     d = _jload(_CONTACTS_F); lst = d.get(str(uid), [])
     lst.append({"name": name, "phone": phone, "status": "новый"})
@@ -633,6 +645,31 @@ def get_phone(country: str) -> str:
     return SPONSOR_PHONE_TKM if country == "TKM" else SPONSOR_PHONE_UZB
 
 # ─── /start — выбор страны ───────────────────────────────────
+async def load_partners_from_sheets():
+    """Загружает партнёров из Google Sheets в локальный кэш при старте."""
+    try:
+        async with httpx.AsyncClient() as c:
+            resp = await c.get(
+                GOOGLE_SHEET_URL,
+                params={"action": "get_partners"},
+                timeout=10
+            )
+            data = resp.json()
+            if data.get("status") == "ok" and data.get("partners"):
+                existing = _jload(_PARTNERS_F)
+                for p in data["partners"]:
+                    uid = str(p.get("user_id", ""))
+                    if uid and uid not in existing:
+                        existing[uid] = {
+                            "name": p.get("name", ""),
+                            "cid":  p.get("company_id", ""),
+                            "lang": p.get("lang", "ru"),
+                        }
+                _jsave(_PARTNERS_F, existing)
+                logger.info(f"Loaded {len(data['partners'])} partners from Sheets")
+    except Exception as e:
+        logger.error(f"load_partners_from_sheets: {e}")
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     await update.message.reply_text(
@@ -1271,6 +1308,21 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
     if context.user_data.pop("webinar_wait", False):
         uname = f"@{user.username}" if user.username else str(user.id)
+        # Сохраняем в локальный файл
+        webinar_add(user.id, user.full_name or uname, text, uname)
+        # Сохраняем в Google Sheets
+        try:
+            async with httpx.AsyncClient() as hc:
+                await hc.post(GOOGLE_SHEET_URL, json={
+                    "type":     "webinar",
+                    "user_id":  str(user.id),
+                    "name":     user.full_name or uname,
+                    "username": uname,
+                    "text":     text,
+                    "lang":     lang,
+                }, timeout=10)
+        except Exception as e:
+            logger.error(f"webinar sheets: {e}")
         try:
             await context.bot.send_message(
                 chat_id=MANAGER_CHAT_ID,
@@ -1487,18 +1539,24 @@ async def admin_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Заявки на вебинар
     if text == "📋 Заявки на вебинар":
-        pending = _jload(_PENDING_F)
-        if not pending:
-            await update.message.reply_text("Заявок пока нет.", reply_markup=ADMIN_KB)
+        webinars = webinar_get_all()
+        if not webinars:
+            await update.message.reply_text("Заявок на вебинар пока нет.", reply_markup=ADMIN_KB)
             return ADMIN_MENU
         lines = []
-        for uid, info in pending.items():
-            lines.append(f"• {info.get('name','—')} | {info.get('uname','—')} | ID: {info.get('cid','—')}")
-        await update.message.reply_text(
-            f"📋 *Заявки ({len(lines)}):*\n\n" + "\n".join(lines),
-            parse_mode="Markdown",
-            reply_markup=ADMIN_KB
-        )
+        for w in webinars:
+            lines.append(
+                f"• {w.get('date','—')} | {w.get('name','—')} | {w.get('uname','—')}\n"
+                f"  📝 {w.get('text','—')}"
+            )
+        msg = f"📋 *Заявки на вебинар ({len(lines)}):*\n\n" + "\n\n".join(lines)
+        # Разбиваем если слишком длинный
+        if len(msg) > 4000:
+            for i in range(0, len(lines), 10):
+                chunk = "\n\n".join(lines[i:i+10])
+                await update.message.reply_text(chunk, reply_markup=ADMIN_KB)
+        else:
+            await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=ADMIN_KB)
         return ADMIN_MENU
 
     # Рассылка
@@ -1601,6 +1659,11 @@ def main():
     app.add_handler(MessageHandler(filters.Regex(r"^/rj[0-9]+$"), partner_reject))
 
     logger.info("🤖 Vertera bot started!")
+
+    # Загружаем партнёров из Google Sheets при старте
+    import asyncio
+    asyncio.get_event_loop().run_until_complete(load_partners_from_sheets())
+
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
