@@ -1041,10 +1041,14 @@ async def anketa_interest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         async with httpx.AsyncClient() as http_client:
             await http_client.post(GOOGLE_SHEET_URL, json={
-                "name": name, "phone": user_phone, "city": city,
+                "type":     "anketa",
+                "country":  country,
+                "lang":     lang,
+                "name":     name,
+                "phone":    user_phone,
+                "city":     city,
                 "interest": interest,
-                "source": f"Telegram Bot Vertera | {country_label} | {lang}",
-                "username": username
+                "username": username,
             }, timeout=10)
     except Exception as e:
         logger.error(f"Sheets error: {e}")
