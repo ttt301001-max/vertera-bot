@@ -25,7 +25,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ─── Состояния ───────────────────────────────────────────────
-SELECT_COUNTRY, SELECT_LANG, CHAT, ANKETA_NAME, ANKETA_PHONE, ANKETA_CITY, ANKETA_INTEREST, PARTNER_ID, PARTNER_MENU, PARTNER_CONTACTS_NAME, PARTNER_CONTACTS_PHONE, ADMIN_MENU = range(12)
+SELECT_COUNTRY, SELECT_LANG, CHAT, ANKETA_NAME, ANKETA_PHONE, ANKETA_CITY, ANKETA_INTEREST, PARTNER_ID, PARTNER_MENU, PARTNER_CONTACTS_NAME, PARTNER_CONTACTS_PHONE, ADMIN_MENU, PARTNER_QUIZ = range(13)
 
 user_histories = {}
 
@@ -38,6 +38,10 @@ _CONTACTS_F  = pathlib.Path("/tmp/vrt_contacts.json")
 _WEBINAR_F   = pathlib.Path("/tmp/vrt_webinar.json")
 _NEWS_F      = pathlib.Path("/tmp/vrt_news.json")
 _PROGRESS_F  = pathlib.Path("/tmp/vrt_progress.json")
+_MKTPROG_F   = pathlib.Path("/tmp/vrt_mkt_progress.json")
+_QUIZ_F      = pathlib.Path("/tmp/vrt_quiz.json")
+_MKTPROG_F   = pathlib.Path("/tmp/vrt_mkt_progress.json")
+_QUIZ_F      = pathlib.Path("/tmp/vrt_quiz.json")
 _USERS_F     = pathlib.Path("/tmp/vrt_users.json")
 
 def _jload(p):
@@ -137,6 +141,67 @@ def progress_set(uid: int, day: int):
     d[str(uid)] = {"day": day}
     _jsave(_PROGRESS_F, d)
 
+
+def mkt_progress_get(uid):
+    return int(_jload(_MKTPROG_F).get(str(uid), {}).get("day", 0))
+
+def mkt_progress_set(uid, day):
+    d = _jload(_MKTPROG_F); d[str(uid)] = {"day": day}; _jsave(_MKTPROG_F, d)
+
+async def mkt_progress_sync(uid, day, name, uname):
+    try:
+        async with httpx.AsyncClient(follow_redirects=True) as c:
+            await c.post(GOOGLE_SHEET_URL, json={"type":"mkt_progress","user_id":str(uid),"name":name,"username":uname,"day":day}, timeout=10)
+    except Exception as e:
+        logger.error(f"mkt_sync: {e}")
+
+async def mkt_progress_load():
+    try:
+        async with httpx.AsyncClient(follow_redirects=True) as c:
+            resp = await c.post(GOOGLE_SHEET_URL, json={"type":"get_mkt_progress"}, timeout=15)
+            data = resp.json()
+            if data.get("status") == "ok":
+                d = _jload(_MKTPROG_F)
+                for row in data.get("progress", []):
+                    uid = str(row.get("user_id","")).strip()
+                    if uid: d[uid] = {"day": int(row.get("day",0))}
+                _jsave(_MKTPROG_F, d)
+    except Exception as e:
+        logger.error(f"mkt_load: {e}")
+
+def quiz_get(uid):
+    return _jload(_QUIZ_F).get(str(uid), {})
+
+def quiz_set(uid, qname, score, total):
+    d = _jload(_QUIZ_F)
+    if str(uid) not in d: d[str(uid)] = {}
+    d[str(uid)][qname] = {"score": score, "total": total}
+    _jsave(_QUIZ_F, d)
+
+async def quiz_sync(uid, qname, score, total, name, uname):
+    try:
+        async with httpx.AsyncClient(follow_redirects=True) as c:
+            await c.post(GOOGLE_SHEET_URL, json={"type":"quiz_result","user_id":str(uid),"name":name,"username":uname,"quiz":qname,"score":score,"total":total}, timeout=10)
+    except Exception as e:
+        logger.error(f"quiz_sync: {e}")
+
+async def quiz_load():
+    try:
+        async with httpx.AsyncClient(follow_redirects=True) as c:
+            resp = await c.post(GOOGLE_SHEET_URL, json={"type":"get_quiz"}, timeout=15)
+            data = resp.json()
+            if data.get("status") == "ok":
+                d = _jload(_QUIZ_F)
+                for row in data.get("results", []):
+                    uid = str(row.get("user_id","")).strip()
+                    qn = row.get("quiz","")
+                    if uid and qn:
+                        if uid not in d: d[uid] = {}
+                        d[uid][qn] = {"score": row.get("score",0), "total": row.get("total",0)}
+                _jsave(_QUIZ_F, d)
+    except Exception as e:
+        logger.error(f"quiz_load: {e}")
+
 async def progress_sync_to_sheets(uid: int, day: int, name: str, uname: str):
     """Сохраняет прогресс в Google Sheets."""
     try:
@@ -223,6 +288,9 @@ PT = {
         "r_try":         "🎁 Вы уже попробовали продукт лично? Личный опыт — лучший аргумент для вашей команды!",
         "btn_contacts": "👥 Мои контакты",
         "btn_news":     "📣 Новости",
+        "btn_quiz":         "🧪 Тесты",
+        "btn_review_learn": "📖 Просмотреть обучение",
+        "btn_review_mkt":   "📖 Просмотреть маркетинг",
         "btn_back":     "🔙 Выйти из меню партнёра",
         "calc_ask":     "Введите количество активных партнёров в вашей команде (число):",
         "c_empty":      "👥 Контактов пока нет. Добавьте первого!",
@@ -275,6 +343,9 @@ PT = {
         "r_try":         "🎁 Önümi şahsy synap gördüňizmi? Şahsy tejribe — toparyňyz üçin iň gowy delil!",
         "btn_contacts": "👥 Meniň kontaktlarym",
         "btn_news":     "📣 Habarlar",
+        "btn_quiz":         "🧪 Testler",
+        "btn_review_learn": "📖 Okuwы syn etmek",
+        "btn_review_mkt":   "📖 Marketingi syn etmek",
         "btn_back":     "🔙 Hyzmatdaş menýusyndan çyk",
         "calc_ask":     "Toparyňyzdaky işjeň hyzmatdaşlaryň sanyny giriziň (san):",
         "c_empty":      "👥 Heniz kontakt ýok. Birinjisini goşuň!",
@@ -327,6 +398,9 @@ PT = {
         "r_try":         "🎁 Mahsulotni shaxsan sinab ko'rdingizmi? Shaxsiy tajriba — jamoangiz uchun eng yaxshi dalil!",
         "btn_contacts": "👥 Mening kontaktlarim",
         "btn_news":     "📣 Yangiliklar",
+        "btn_quiz":         "🧪 Testlar",
+        "btn_review_learn": "📖 O'qitishni ko'rish",
+        "btn_review_mkt":   "📖 Marketingni ko'rish",
         "btn_back":     "🔙 Hamkorlik menyusidan chiqish",
         "calc_ask":     "Jamoangizdagi faol hamkorlar sonini kiriting (raqam):",
         "c_empty":      "👥 Hali kontakt yo'q. Birinchisini qo'shing!",
@@ -366,8 +440,8 @@ def get_partner_kb(lang):
     p = PT.get(lang, PT["ru"])
     return ReplyKeyboardMarkup(
         [[p["btn_learn"],    p["btn_market"]],
-         [p["btn_contacts"], p["btn_webinar"]],
-         [p["btn_news"]],
+         [p["btn_quiz"],     p["btn_contacts"]],
+         [p["btn_webinar"],  p["btn_news"]],
          [p["btn_back"]]],
         resize_keyboard=True
     )
@@ -792,6 +866,8 @@ async def _load_partners_impl(app=None):
     except Exception as e:
         logger.error(f"load_partners error: {e}")
     await progress_load_from_sheets()
+    await mkt_progress_load()
+    await quiz_load()
     await users_load_from_sheets()
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1280,6 +1356,291 @@ async def partner_receive_id(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 # Тексты маркетинга с PV
+
+# ══════════════════════════════════════════════════════════════
+# 7 ДНЕЙ МАРКЕТИНГА
+# ══════════════════════════════════════════════════════════════
+MKT_DAYS = {
+    1: {
+        "ru": ("📊 *Маркетинг — День 1: Основные понятия*\n\n"
+               "Прежде чем зарабатывать — нужно говорить на языке системы.\n\n"
+               "📌 *PV (Personal Volume)* — баллы продукта. Каждый товар имеет ценность в PV. Все бонусы считаются именно через PV.\n\n"
+               "📌 *UE* — единая расчётная валюта.\n• 1 UE = 15 манат (Туркменистан)\n• 1 UE = 10 000 сум (Узбекистан)\n\n"
+               "📌 *ЛО (Личный объём)* — сумма PV твоих личных покупок за месяц.\n\n"
+               "📌 *ГО (Групповой объём)* — суммарный PV всех покупок твоей команды.\n\n"
+               "📌 *Клиент* — покупает для себя, менее 20 PV. Скидка 30%.\n\n"
+               "📌 *Партнёр* — покупка от 20 PV. Получает бонусы и скидку 30%.\n\n"
+               "📌 *Наставник* — партнёр, зарегистрировавший нового партнёра под свой ID.\n\n"
+               "📌 *ID* — твой уникальный регистрационный номер в системе Vertera.\n\n"
+               "✅ Понял основные понятия? Нажми кнопку ниже 👇"),
+        "tk": ("📊 *Marketing — 1-nji gün: Esasy düşünjeler*\n\n"
+               "📌 *PV* — önüm ballary. Ähli bonuslar PV arkaly hasaplanýar.\n\n"
+               "📌 *UE* — ýeke hasaplaşyk walýutasy.\n• 1 UE = 15 manat (TKM)\n• 1 UE = 10 000 sum (UZB)\n\n"
+               "📌 *ÝO* — şahsy satyn alyşlaryňyzyň aýlyk PV jemi.\n\n"
+               "📌 *GO* — toparyňyzyň ähli satyn alyşlarynyň PV jemi.\n\n"
+               "📌 *Müşderi* — 20 PV-den az. 30% arzanladyş.\n\n"
+               "📌 *Hyzmatdaş* — 20 PV we ýokary. Bonuslar + 30% arzanladyş.\n\n"
+               "📌 *Halypa* — täze hyzmatdaşy öz ID-si bilen hasaba alan.\n\n"
+               "✅ Esasy düşünjeleri özleşdirdiňmi? Bas 👇"),
+        "uz": ("📊 *Marketing — 1-kun: Asosiy tushunchalar*\n\n"
+               "📌 *PV* — mahsulot ballari. Barcha bonuslar PV orqali hisoblanadi.\n\n"
+               "📌 *UE* — yagona hisob valyutasi.\n• 1 UE = 15 manat (TKM)\n• 1 UE = 10 000 so'm (UZB)\n\n"
+               "📌 *LO* — oylik shaxsiy xaridlaringizning PV yig'indisi.\n\n"
+               "📌 *GO* — jamoangiz barcha xaridlarining umumiy PV-si.\n\n"
+               "📌 *Mijoz* — 20 PV dan kam. 30% chegirma.\n\n"
+               "📌 *Hamkor* — 20 PV va ko'proq. Bonuslar + 30% chegirma.\n\n"
+               "📌 *Murabbiy* — yangi hamkorni o'z ID-si ostida ro'yxatdan o'tkazgan.\n\n"
+               "✅ Asosiy tushunchalarni o'rgandingmi? Bos 👇"),
+    },
+    2: {
+        "ru": ("📊 *Маркетинг — День 2: Активность*\n\n"
+               "⚡ Главное правило: без активности — нет дохода!\n\n"
+               "🔹 *Личная активность* — покупка от 20 PV. Открывает право на бонусы на 30 дней.\n\n"
+               "🔹 *Лидерская активность* — покупка от 40 PV за месяц. Открывает дополнительные вознаграждения.\n\n"
+               "🔹 *Бинарная активность* — минимум 2 лично приглашённых партнёра (по 1 в каждую ветку) с активностью 20 PV.\n\n"
+               "📊 *Три уровня активности:*\n"
+               "• Личная (20 PV) → базовый доход\n"
+               "• Лидерская (40 PV) → доп. бонусы\n"
+               "• Бинарная (2 партнёра 20 PV) → КББ\n\n"
+               "💡 Делай покупку в начале месяца — не теряй активность!\n\n"
+               "✅ Запомнил? Нажми кнопку ниже 👇"),
+        "tk": ("📊 *Marketing — 2-nji gün: Işjeňlik*\n\n"
+               "⚡ Esasy düzgün: işjeňliksiz — girdeji ýok!\n\n"
+               "🔹 *Şahsy işjeňlik* — 20 PV-den satyn alyş. 30 gün bonus hukugy.\n\n"
+               "🔹 *Lider işjeňligi* — aýda 40 PV-den satyn alyş. Goşmaça sylaglar.\n\n"
+               "🔹 *Binar işjeňligi* — her şahada 1-den, 2 hyzmatdaş 20 PV ýerine ýetirmeli.\n\n"
+               "📊 *Üç dereje:*\n• Şahsy (20 PV) → esasy\n• Lider (40 PV) → goşmaça\n• Binar (2×20 PV) → KBB\n\n"
+               "✅ Ýatladyňmy? Bas 👇"),
+        "uz": ("📊 *Marketing — 2-kun: Faollik*\n\n"
+               "⚡ Asosiy qoida: faoliksiz — daromad yo'q!\n\n"
+               "🔹 *Shaxsiy faollik* — 20 PV dan xarid. 30 kun bonus huquqi.\n\n"
+               "🔹 *Lider faolligi* — oyda 40 PV dan xarid. Qo'shimcha mukofotlar.\n\n"
+               "🔹 *Binar faolligi* — har tarmoqda 1 tadan, 2 hamkor 20 PV bajarishi.\n\n"
+               "📊 *Uch daraja:*\n• Shaxsiy (20 PV) → asosiy\n• Lider (40 PV) → qo'shimcha\n• Binar (2×20 PV) → KBB\n\n"
+               "✅ Esladingmi? Bos 👇"),
+    },
+    3: {
+        "ru": ("📊 *Маркетинг — День 3: Бонус за приглашение (БЗП)*\n\n"
+               "💰 *БЗП = 40%* от PV с каждой покупки партнёров первой линии\n\n"
+               "📊 *Примеры:*\n• 20 PV → 8 UE = 120 манат\n• 40 PV → 16 UE = 240 манат\n• 100 PV → 40 UE = 600 манат\n• 200 PV → 80 UE = 1 200 манат\n\n"
+               "✅ *Условие:* личная активность (20 PV). Бонус — моментально!\n\n"
+               "⚠️ *Перелив:* если у наставника нет активности — БЗП уходит вверх через 24 часа.\n\n"
+               "🔄 Бонус начисляется за ВСЕ покупки первой линии — первую и все последующие.\n\n"
+               "💡 Больше активных партнёров в первой линии = больше пассивного дохода!\n\n"
+               "✅ Понял БЗП? Нажми кнопку ниже 👇"),
+        "tk": ("📊 *Marketing — 3-nji gün: Çakylyk bonusy (BZP)*\n\n"
+               "💰 *BZP = 40%* birinji liniýadaky her satyn alşyndan\n\n"
+               "📊 *Mysallar:*\n• 20 PV → 8 UE\n• 40 PV → 16 UE\n• 100 PV → 40 UE\n• 200 PV → 80 UE\n\n"
+               "✅ *Şert:* şahsy işjeňlik (20 PV). Bonus — dessine!\n\n"
+               "⚠️ *Geçirme:* halypada işjeňlik ýok bolsa — BZP 24 sagatdan soň ýokary geçirilýär.\n\n"
+               "💡 Birinji liniýada näçe işjeň hyzmatdaş — BZP şonça köp!\n\n"
+               "✅ BZP-ni düşündiňmi? Bas 👇"),
+        "uz": ("📊 *Marketing — 3-kun: Taklif bonusi (BZP)*\n\n"
+               "💰 *BZP = 40%* birinchi liniya har xarididan\n\n"
+               "📊 *Misollar:*\n• 20 PV → 8 UE\n• 40 PV → 16 UE\n• 100 PV → 40 UE\n• 200 PV → 80 UE\n\n"
+               "✅ *Shart:* shaxsiy faollik (20 PV). Bonus — darhol!\n\n"
+               "⚠️ *Ko'chirish:* murabbiyda faollik yo'q bo'lsa — BZP 24 soatdan keyin yuqoriga o'tadi.\n\n"
+               "💡 Birinchi liniyada qancha faol hamkor — BZP shuncha ko'p!\n\n"
+               "✅ BZP ni tushundingmi? Bos 👇"),
+    },
+    4: {
+        "ru": ("📊 *Маркетинг — День 4: Клубная система*\n\n"
+               "🏆 *Клуб 120 → 55 UE/мес*\n• ЛО от 20 PV\n• Первая линия от 120 PV\n• 25% объёма — новые клиенты\n\n"
+               "🏆 *Клуб 220 → 110 UE/мес*\n• ЛО от 20 PV\n• Первая линия от 200 PV\n• 25% объёма — новые клиенты\n\n"
+               "🎁 *При выполнении обоих клубов:*\n• 100% кэшбэк на все покупки\n• Участие в розыгрыше смартфона!\n\n"
+               "📌 *Кэшбэк* действует 90 дней. Сгорает через 3 месяца без использования.\n\n"
+               "💡 Приглашай новичков — они дают 25% от нужного объёма!\n\n"
+               "✅ Запомнил клубную систему? Нажми кнопку ниже 👇"),
+        "tk": ("📊 *Marketing — 4-nji gün: Klub ulgamy*\n\n"
+               "🏆 *Klub 120 → aýda 55 UE*\n• ÝO 20 PV-den\n• Birinji liniýa 120 PV-den\n• 25% — täze müşderiler\n\n"
+               "🏆 *Klub 220 → aýda 110 UE*\n• ÝO 20 PV-den\n• Birinji liniýa 200 PV-den\n• 25% — täze müşderiler\n\n"
+               "🎁 *Iki klub ýerine ýetirilende:*\n• 100% kэşbэk\n• Smartfon bäsleşigi!\n\n"
+               "💡 Täze adamlary çagyr — olar gerekli göwrümiň 25%-ini berýär!\n\n"
+               "✅ Klub ulgamyny ýatladyňmy? Bas 👇"),
+        "uz": ("📊 *Marketing — 4-kun: Klub tizimi*\n\n"
+               "🏆 *Klub 120 → oyda 55 UE*\n• LO 20 PV dan\n• Birinchi liniya 120 PV dan\n• 25% — yangi mijozlar\n\n"
+               "🏆 *Klub 220 → oyda 110 UE*\n• LO 20 PV dan\n• Birinchi liniya 200 PV dan\n• 25% — yangi mijozlar\n\n"
+               "🎁 *Ikkala klub bajarilganda:*\n• 100% keshbek\n• Smartfon qur'asi!\n\n"
+               "💡 Yangi odamlarni taklif qil — ular kerakli hajmning 25% ini beradi!\n\n"
+               "✅ Klub tizimini esladingmi? Bos 👇"),
+    },
+    5: {
+        "ru": ("📊 *Маркетинг — День 5: Бинар и КББ*\n\n"
+               "🌳 Каждый партнёр имеет 2 ветки: левая и правая.\n\n"
+               "🔄 *1 цикл* = 40 PV слева + 40 PV справа → начисляется КББ\n\n"
+               "💰 *КББ по статусам:*\n"
+               "• GOLD (20%) → 8 UE/цикл (лимит 500 UE/нед)\n"
+               "• PLATINUM (25%) → 10 UE/цикл (лимит 20 000 UE/нед)\n"
+               "• PREMIUM (35%) → 14 UE/цикл (лимит 50 000 UE/нед)\n\n"
+               "📌 *Лимиты PV с покупки:*\n• GOLD: до 20 PV\n• PLATINUM: до 100 PV\n• PREMIUM: без ограничений\n\n"
+               "🔄 *Spillover:* вышестоящие могут размещать своих партнёров в твою структуру!\n\n"
+               "✅ Понял бинар и КББ? Нажми кнопку ниже 👇"),
+        "tk": ("📊 *Marketing — 5-nji gün: Binar we KBB*\n\n"
+               "🌳 Her hyzmatdaşda 2 şaha: çep we sag.\n\n"
+               "🔄 *1 sikl* = 40 PV çep + 40 PV sag → KBB hasaplanýar\n\n"
+               "💰 *Status boýunça KBB:*\n• GOLD → 8 UE/sikl\n• PLATINUM → 10 UE/sikl\n• PREMIUM → 14 UE/sikl\n\n"
+               "📌 *Satyn alyşdan PV çäkleri:*\n• GOLD: 20 PV\n• PLATINUM: 100 PV\n• PREMIUM: çäksiz\n\n"
+               "✅ Binar we KBB-ni düşündiňmi? Bas 👇"),
+        "uz": ("📊 *Marketing — 5-kun: Binar va KBB*\n\n"
+               "🌳 Har hamkorning 2 tarmog'i: chap va o'ng.\n\n"
+               "🔄 *1 sikl* = 40 PV chap + 40 PV o'ng → KBB hisoblanadi\n\n"
+               "💰 *Status bo'yicha KBB:*\n• GOLD → 8 UE/sikl\n• PLATINUM → 10 UE/sikl\n• PREMIUM → 14 UE/sikl\n\n"
+               "📌 *Xariddan PV chegaralari:*\n• GOLD: 20 PV\n• PLATINUM: 100 PV\n• PREMIUM: cheksiz\n\n"
+               "✅ Binar va KBB ni tushundingmi? Bos 👇"),
+    },
+    6: {
+        "ru": ("📊 *Маркетинг — День 6: Квалификации и БЗК*\n\n"
+               "🏅 *Квалификации и выплаты:*\n"
+               "• Гранат: ГО 400 PV → *150 UE/мес*\n"
+               "• Рубин: ГО 800 PV → *233 UE/мес*\n"
+               "• Изумруд: ГО 2 000 PV → *333 UE/мес*\n"
+               "• Сапфир: ГОБ 5 000 PV → *500 UE/мес*\n"
+               "• Бриллиант: ГОБ 15 000 PV → *500 UE/мес*\n"
+               "• Красный Бриллиант 3К: ГОБ 65 000 PV → *500 UE + Бустер*\n\n"
+               "🚀 *Бустер бонус:* +20% к КББ при первом достижении квалификации "
+               "от Красный Бриллиант 3К. Единоразово!\n\n"
+               "✅ Запомнил квалификации? Нажми кнопку ниже 👇"),
+        "tk": ("📊 *Marketing — 6-njy gün: Derejeler we BZK*\n\n"
+               "🏅 *Derejeler:*\n• Granat: GO 400 PV → *aýda 150 UE*\n"
+               "• Rubin: GO 800 PV → *233 UE*\n• Zümrüt: GO 2000 PV → *333 UE*\n"
+               "• Sapfir: GOB 5000 PV → *500 UE*\n• Brilliýant: GOB 15000 PV → *500 UE*\n\n"
+               "🚀 *Buster bonus:* KBB-e +20%, ilkinji Gyzyl Brilliýant 3K-da. Bir gezek!\n\n"
+               "✅ Derejelerý ýatladyňmy? Bas 👇"),
+        "uz": ("📊 *Marketing — 6-kun: Malakalar va BZK*\n\n"
+               "🏅 *Malakalar:*\n• Granat: GO 400 PV → *oyda 150 UE*\n"
+               "• Rubin: GO 800 PV → *233 UE*\n• Zumrud: GO 2000 PV → *333 UE*\n"
+               "• Zangori: GOB 5000 PV → *500 UE*\n• Brilliant: GOB 15000 PV → *500 UE*\n\n"
+               "🚀 *Buster bonus:* KBB ga +20%, birinchi Qizil Brilliant 3K da. Bir marta!\n\n"
+               "✅ Malakalarni esladingmi? Bos 👇"),
+    },
+    7: {
+        "ru": ("📊 *Маркетинг — День 7: Бонус наставника*\n\n"
+               "🎓 *БН* считается от КББ партнёров по дереву наставника.\n\n"
+               "📊 *Глубина зависит от квалификации:*\n"
+               "• Сапфир → 3 уровня\n• Выше → до 10 уровней\n\n"
+               "Начисляется с партнёров с *равной или меньшей* квалификацией.\n\n"
+               "💰 *Пример:* Ты Сапфир, партнёр 1 линии Сапфир → 10% от его КББ\n\n"
+               "✅ *Условия:* статус Premium + квалификация Сапфир + личная активность\n"
+               "Бонус начисляется после конца месяца.\n\n"
+               "🏆 *Поздравляем! Ты изучил весь маркетинговый план Vertera!*\n"
+               "Теперь пройди тест → нажми «🧪 Тесты» 💪"),
+        "tk": ("📊 *Marketing — 7-nji gün: Halypa bonusy*\n\n"
+               "🎓 *BN* halypanyň agaç bölümindäki KBB-den hasaplanýar.\n\n"
+               "📊 *Derejeňize görä:*\n• Sapfir → 3 dereje\n• Ýokary → 10 derejä çenli\n\n"
+               "Deň ýa-da az derejeli hyzmatdaşlardan hasaplanýar.\n\n"
+               "✅ *Şertler:* Premium statusy + Sapfir derejesi + işjeňlik\n\n"
+               "🏆 *Gutlaýarys! Vertera marketing meýilnamasyny doly öwrendiňiz!*\n"
+               "Indi testi geç → «🧪 Testler» 💪"),
+        "uz": ("📊 *Marketing — 7-kun: Murabbiy bonusi*\n\n"
+               "🎓 *BN* murabbiy daraxti bo'yicha KBB dan hisoblanadi.\n\n"
+               "📊 *Malakangizga qarab:*\n• Zangori → 3 daraja\n• Yuqori → 10 darajagacha\n\n"
+               "Teng yoki past malakali hamkorlardan hisoblanadi.\n\n"
+               "✅ *Shartlar:* Premium statusi + Zangori malakasi + faollik\n\n"
+               "🏆 *Tabriklaymiz! Vertera marketing rejasini to'liq o'rgandingiz!*\n"
+               "Endi testdan o'ting → «🧪 Testlar» 💪"),
+    },
+}
+
+MKT_DONE_BTN   = {"ru":"✅ День изучен! Далее","tk":"✅ Gün öwrenildi! Dowam et","uz":"✅ Kun o'rganildi! Davom etish"}
+MKT_REPEAT_BTN = {"ru":"🔁 Повторить день","tk":"🔁 Güni gaýtala","uz":"🔁 Kunni takrorla"}
+MKT_ALL_DONE   = {
+    "ru":"🏆 Маркетинговый план пройден! Нажми «🧪 Тесты» для закрепления знаний",
+    "tk":"🏆 Marketing meýilnamasy geçildi! Bilimi berkitmek üçin «🧪 Testler» bas",
+    "uz":"🏆 Marketing rejasi o'tildi! Bilimni mustahkamlash uchun «🧪 Testlar» bos",
+}
+MKT_REVIEW_DAYS = {
+    "ru":["📅 День 1 — Понятия","📅 День 2 — Активность","📅 День 3 — БЗП",
+          "📅 День 4 — Клубы","📅 День 5 — Бинар","📅 День 6 — Квалификации","📅 День 7 — Наставник"],
+    "tk":["📅 1-gün — Düşünjeler","📅 2-gün — Işjeňlik","📅 3-gün — BZP",
+          "📅 4-gün — Klub","📅 5-gün — Binar","📅 6-gün — Derejeler","📅 7-gün — Halypa"],
+    "uz":["📅 1-kun — Tushunchalar","📅 2-kun — Faollik","📅 3-kun — BZP",
+          "📅 4-kun — Klublar","📅 5-kun — Binar","📅 6-kun — Malakalar","📅 7-kun — Murabbiy"],
+}
+LEARN_REVIEW_DAYS = {
+    "ru":["📅 День 1 — Старт","📅 День 2 — Встреча","📅 День 3 — Контроль",
+          "📅 День 4 — Аналитика","📅 День 5 — Результат","📅 День 6 — Масштаб","📅 День 7 — Фиксация"],
+    "tk":["📅 1-gün — Başlangyç","📅 2-gün — Duşuşyk","📅 3-gün — Gözegçilik",
+          "📅 4-gün — Analitika","📅 5-gün — Netije","📅 6-gün — Masştab","📅 7-gün — Berkitmek"],
+    "uz":["📅 1-kun — Boshlash","📅 2-kun — Uchrashuv","📅 3-kun — Nazorat",
+          "📅 4-kun — Tahlil","📅 5-kun — Natija","📅 6-kun — Masshtab","📅 7-kun — Mustahkamlash"],
+}
+
+# ══════════════════════════════════════════════════════════════
+# ТЕСТЫ
+# ══════════════════════════════════════════════════════════════
+QUIZ_NAMES = {
+    "products":  {"ru":"Продукты Vertera","tk":"Vertera önümleri","uz":"Vertera mahsulotlari"},
+    "marketing": {"ru":"Маркетинг и бонусы","tk":"Marketing we bonuslar","uz":"Marketing va bonuslar"},
+    "work":      {"ru":"Работа с новичками","tk":"Täze adamlar bilen iş","uz":"Yangilar bilan ishlash"},
+}
+QUIZ_ORDER = ["products","marketing","work"]
+
+QUIZ_DATA = {
+    "products": [
+        {"q":{"ru":"Что является основным компонентом Vertera Gel?","tk":"Vertera Gel-iň esasy düzümi näme?","uz":"Vertera Gel ning asosiy tarkibi nima?"},
+         "o":{"ru":["А) Спирулина","Б) Ламинария","В) Хлорелла"],"tk":["A) Spirulina","B) Laminariýa","C) Hlorella"],"uz":["A) Spirulina","B) Laminaria","V) Xlorella"]},
+         "a":1,"e":{"ru":"Vertera Gel создан на основе ламинарии — бурой морской водоросли.","tk":"Vertera Gel laminariýa esasynda döredildi.","uz":"Vertera Gel laminaria asosida yaratilgan."}},
+        {"q":{"ru":"Какой pH у Vertera Forte Original?","tk":"Vertera Forte Original-yň pH-y näçe?","uz":"Vertera Forte Original ning pH darajasi qancha?"},
+         "o":{"ru":["А) 5.0","Б) 7.9","В) 8.5"],"tk":["A) 5.0","B) 7.9","C) 8.5"],"uz":["A) 5.0","B) 7.9","V) 8.5"]},
+         "a":2,"e":{"ru":"Vertera Forte Original имеет pH 8.5.","tk":"Vertera Forte Original pH 8.5.","uz":"Vertera Forte Original pH 8.5."}},
+        {"q":{"ru":"С какого возраста можно употреблять Умный ребёнок?","tk":"Akylly çagany haçandan ulanyp bolýar?","uz":"Aqlli bolani necha yoshdan iste'mol qilish mumkin?"},
+         "o":{"ru":["А) с 1 года","Б) с 3 лет","В) с 6 лет"],"tk":["A) 1 ýaşdan","B) 3 ýaşdan","C) 6 ýaşdan"],"uz":["A) 1 yoshdan","B) 3 yoshdan","V) 6 yoshdan"]},
+         "a":1,"e":{"ru":"Умный ребёнок для детей от 3 лет.","tk":"Akylly çaga 3 ýaşdan.","uz":"Aqlli bola 3 yoshdan."}},
+        {"q":{"ru":"Сколько клинических исследований прошёл Vertera Gel?","tk":"Vertera Gel näçe kliniki syndan geçdi?","uz":"Vertera Gel nechta klinik tadqiqotdan o'tgan?"},
+         "o":{"ru":["А) 3","Б) 6","В) 10"],"tk":["A) 3","B) 6","C) 10"],"uz":["A) 3","B) 6","V) 10"]},
+         "a":1,"e":{"ru":"Vertera Gel прошёл 6 клинических исследований.","tk":"Vertera Gel 6 syndan geçdi.","uz":"Vertera Gel 6 ta tadqiqotdan o'tgan."}},
+        {"q":{"ru":"Какой продукт направлен на здоровье сосудов?","tk":"Haýsy önüm damar saglygy üçin?","uz":"Qaysi mahsulot tomir salomatligi uchun?"},
+         "o":{"ru":["А) Vertera Gel","Б) AngioLive","В) Smart Kid"],"tk":["A) Vertera Gel","B) AngioLive","C) Smart Kid"],"uz":["A) Vertera Gel","B) AngioLive","V) Smart Kid"]},
+         "a":1,"e":{"ru":"AngioLive с экстрактом красного винограда для здоровья сосудов.","tk":"AngioLive damar saglygy üçin.","uz":"AngioLive tomir salomatligi uchun."}},
+        {"q":{"ru":"Какая технология используется в косметике Vertera?","tk":"Vertera kosmetikasynda haýsy tehnologiýa?","uz":"Vertera kosmetikasida qaysi texnologiya?"},
+         "o":{"ru":["А) Nano Tech","Б) Plasma Technology","В) Bio Matrix"],"tk":["A) Nano Tech","B) Plasma Technology","C) Bio Matrix"],"uz":["A) Nano Tech","B) Plasma Technology","V) Bio Matrix"]},
+         "a":1,"e":{"ru":"Vertera использует Plasma Technology.","tk":"Vertera Plasma Technology ulanýar.","uz":"Vertera Plasma Technology dan foydalanadi."}},
+        {"q":{"ru":"Сколько полезных веществ в Умном ребёнке?","tk":"Akylly çagada näçe peýdaly madda?","uz":"Aqlli bolada qancha foydali modda?"},
+         "o":{"ru":["А) 50+","Б) 100+","В) 140+"],"tk":["A) 50+","B) 100+","C) 140+"],"uz":["A) 50+","B) 100+","V) 140+"]},
+         "a":2,"e":{"ru":"Умный ребёнок содержит 140+ полезных веществ.","tk":"Akylly çaga 140+ madda.","uz":"Aqlli bola 140+ foydali modda."}},
+    ],
+    "marketing": [
+        {"q":{"ru":"Сколько % составляет БЗП?","tk":"BZP näçe göterim?","uz":"BZP necha foiz?"},
+         "o":{"ru":["А) 20%","Б) 30%","В) 40%"],"tk":["A) 20%","B) 30%","C) 40%"],"uz":["A) 20%","B) 30%","V) 40%"]},
+         "a":2,"e":{"ru":"БЗП = 40% от PV покупки партнёров первой линии.","tk":"BZP = 40%.","uz":"BZP = 40%."}},
+        {"q":{"ru":"Минимальный ЛО для личной активности?","tk":"Şahsy işjeňlik üçin minimal ÝO?","uz":"Shaxsiy faollik uchun minimal LO?"},
+         "o":{"ru":["А) 10 PV","Б) 20 PV","В) 40 PV"],"tk":["A) 10 PV","B) 20 PV","C) 40 PV"],"uz":["A) 10 PV","B) 20 PV","V) 40 PV"]},
+         "a":1,"e":{"ru":"Личная активность = покупка от 20 PV.","tk":"Şahsy işjeňlik = 20 PV.","uz":"Shaxsiy faollik = 20 PV."}},
+        {"q":{"ru":"Сколько UE даёт Клуб 220?","tk":"Klub 220 näçe UE berýär?","uz":"Klub 220 necha UE beradi?"},
+         "o":{"ru":["А) 55 UE","Б) 100 UE","В) 110 UE"],"tk":["A) 55 UE","B) 100 UE","C) 110 UE"],"uz":["A) 55 UE","B) 100 UE","V) 110 UE"]},
+         "a":2,"e":{"ru":"Клуб 220 = 110 UE в месяц.","tk":"Klub 220 = 110 UE aýda.","uz":"Klub 220 = 110 UE oyda."}},
+        {"q":{"ru":"PV для закрытия 1 цикла КББ с каждой стороны?","tk":"KBB 1 siklini ýapmak üçin her tarapdan?","uz":"KBB 1 siklini yopish uchun har tomondan?"},
+         "o":{"ru":["А) 20 PV","Б) 40 PV","В) 100 PV"],"tk":["A) 20 PV","B) 40 PV","C) 100 PV"],"uz":["A) 20 PV","B) 40 PV","V) 100 PV"]},
+         "a":1,"e":{"ru":"1 цикл = 40 PV слева + 40 PV справа.","tk":"1 sikl = 40 PV çep + 40 PV sag.","uz":"1 sikl = 40 PV chap + 40 PV o'ng."}},
+        {"q":{"ru":"КББ со статусом PREMIUM за 1 цикл?","tk":"PREMIUM statusy bilen KBB 1 sikl üçin?","uz":"PREMIUM statusi bilan KBB 1 sikl uchun?"},
+         "o":{"ru":["А) 8 UE","Б) 10 UE","В) 14 UE"],"tk":["A) 8 UE","B) 10 UE","C) 14 UE"],"uz":["A) 8 UE","B) 10 UE","V) 14 UE"]},
+         "a":2,"e":{"ru":"PREMIUM = 35% = 14 UE за цикл.","tk":"PREMIUM = 14 UE sikl üçin.","uz":"PREMIUM = 14 UE sikl uchun."}},
+        {"q":{"ru":"БЗК с квалификацией Сапфир?","tk":"Sapfir derejeli BZK?","uz":"Zangori malakali BZK?"},
+         "o":{"ru":["А) 150 UE","Б) 333 UE","В) 500 UE"],"tk":["A) 150 UE","B) 333 UE","C) 500 UE"],"uz":["A) 150 UE","B) 333 UE","V) 500 UE"]},
+         "a":2,"e":{"ru":"Сапфир и выше = 500 UE в месяц.","tk":"Sapfir we ýokary = 500 UE aýda.","uz":"Zangori va yuqori = 500 UE oyda."}},
+        {"q":{"ru":"1 UE в Туркменистане?","tk":"Türkmenistanda 1 UE?","uz":"Turkmanistonda 1 UE?"},
+         "o":{"ru":["А) 10 манат","Б) 15 манат","В) 20 манат"],"tk":["A) 10 manat","B) 15 manat","C) 20 manat"],"uz":["A) 10 manat","B) 15 manat","V) 20 manat"]},
+         "a":1,"e":{"ru":"1 UE = 15 манат (TKM), 10 000 сум (UZB).","tk":"1 UE = 15 manat (TKM).","uz":"1 UE = 15 manat (TKM)."}},
+    ],
+    "work": [
+        {"q":{"ru":"Сколько приглашений нужно в День 1?","tk":"1-nji günde näçe çakylyk?","uz":"1-kunda nechta taklif?"},
+         "o":{"ru":["А) 1","Б) 3","В) 10"],"tk":["A) 1","B) 3","C) 10"],"uz":["A) 1","B) 3","V) 10"]},
+         "a":1,"e":{"ru":"День 1: отправить минимум 3 приглашения.","tk":"1-nji gün: azyndan 3 çakylyk.","uz":"1-kun: kamida 3 ta taklif."}},
+        {"q":{"ru":"Что означает правило 72 часов?","tk":"72 sagat düzgüni näme?","uz":"72 soat qoidasi nima?"},
+         "o":{"ru":["А) Отдыхать 72 часа","Б) Действовать в первые 72 часа","В) Звонить каждые 72 часа"],"tk":["A) 72 sagat dynç al","B) Ilkinji 72 sagatda hereket et","C) 72 sagatdan bir jaň et"],"uz":["A) 72 soat dam ol","B) Birinchi 72 soatda harakat qil","V) Har 72 soatda qo'ngiroq qil"]},
+         "a":1,"e":{"ru":"72 часа: если не действуешь — человек 'остывает'.","tk":"72 sagat: hereket etmeseň adam 'sowuýar'.","uz":"72 soat: harakat qilmasang odam 'soviydi'."}},
+        {"q":{"ru":"Формула конверсии в работе с новичками?","tk":"Konwersiýa formulasy?","uz":"Konversiya formulasi?"},
+         "o":{"ru":["А) 5 сообщений = 1 встреча","Б) 10 сообщений = 3 ответа = 1 встреча","В) 20 сообщений = 1 партнёр"],"tk":["A) 5 habar = 1 duşuşyk","B) 10 habar = 3 jogap = 1 duşuşyk","C) 20 habar = 1 hyzmatdaş"],"uz":["A) 5 xabar = 1 uchrashuv","B) 10 xabar = 3 javob = 1 uchrashuv","V) 20 xabar = 1 hamkor"]},
+         "a":1,"e":{"ru":"10 сообщений = 3 ответа = 1 встреча.","tk":"10 habar = 3 jogap = 1 duşuşyk.","uz":"10 xabar = 3 javob = 1 uchrashuv."}},
+        {"q":{"ru":"Что делать на первой встрече?","tk":"Ilkinji duşuşykda näme?","uz":"Birinchi uchrashuvda nima?"},
+         "o":{"ru":["А) Всё подробно объяснить","Б) Не обучать — показывать результаты","В) Рассказать о всех продуктах"],"tk":["A) Jikme-jik düşündirmek","B) Öwretme — netijeleri görkez","C) Ähli önümler hakda"],"uz":["A) Hamma narsani tushuntirish","B) O'rgatma — natijalarni ko'rsat","V) Barcha mahsulotlar haqida"]},
+         "a":1,"e":{"ru":"Правило: не обучай — показывай результаты, систему, продукт.","tk":"Düzgün: öwretme — görkez.","uz":"Qoida: o'rgatma — ko'rsat."}},
+        {"q":{"ru":"В какой день фиксируем первый результат?","tk":"Ilkinji netijäni haýsy günde?","uz":"Birinchi natijani qaysi kunda?"},
+         "o":{"ru":["А) День 3","Б) День 5","В) День 7"],"tk":["A) 3-nji gün","B) 5-nji gün","C) 7-nji gün"],"uz":["A) 3-kun","B) 5-kun","V) 7-kun"]},
+         "a":1,"e":{"ru":"День 5 — создать веру через первый результат.","tk":"5-nji gün — ilkinji netije.","uz":"5-kun — birinchi natija."}},
+    ],
+}
+
 MARKET_FULL = {
     "ru": (
         "📊 *Маркетинг Vertera*\n\n"
@@ -1746,7 +2107,9 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             await progress_sync_to_sheets(user.id, 1, user.full_name or "", f"@{user.username}" if user.username else str(user.id))
             day = 1
         if day > 7:
-            await update.message.reply_text(DAYS_ALL_DONE.get(lang, DAYS_ALL_DONE["ru"]), reply_markup=get_partner_kb(lang))
+            review_btn = p.get("btn_review_learn","📖 Просмотреть обучение")
+            kb = ReplyKeyboardMarkup([[review_btn],[p["btn_back"]]],resize_keyboard=True)
+            await update.message.reply_text(DAYS_ALL_DONE.get(lang, DAYS_ALL_DONE["ru"]), reply_markup=kb)
             return PARTNER_MENU
         day_text = DAYS[day].get(lang, DAYS[day]["ru"])
         done_btn = DAYS_DONE_BTN.get(lang, DAYS_DONE_BTN["ru"])
@@ -1817,14 +2180,124 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_text(day_text, parse_mode="Markdown", reply_markup=learn_kb)
         return PARTNER_MENU
 
-    # Маркетинг — с PV и товарооборотом
+    # Маркетинг — 7 дней с прогрессом
     if text == p["btn_market"]:
-        await update.message.reply_text(
-            MARKET_FULL.get(lang, MARKET_FULL["ru"]),
-            parse_mode="Markdown",
-            reply_markup=get_partner_kb(lang)
-        )
+        day = mkt_progress_get(user.id)
+        uname = f"@{user.username}" if user.username else str(user.id)
+        if day == 0:
+            mkt_progress_set(user.id, 1)
+            await mkt_progress_sync(user.id, 1, user.full_name or "", uname)
+            day = 1
+        if day > 7:
+            kb = ReplyKeyboardMarkup([[p.get("btn_review_mkt","📖 Просмотреть маркетинг")],[p["btn_back"]]],resize_keyboard=True)
+            await update.message.reply_text(MKT_ALL_DONE.get(lang,MKT_ALL_DONE["ru"]),reply_markup=kb)
+            return PARTNER_MENU
+        mkt_kb = ReplyKeyboardMarkup([[MKT_DONE_BTN.get(lang,MKT_DONE_BTN["ru"])],[MKT_REPEAT_BTN.get(lang,MKT_REPEAT_BTN["ru"])],[p["btn_back"]]],resize_keyboard=True)
+        await update.message.reply_text(MKT_DAYS[day].get(lang,MKT_DAYS[day]["ru"]),parse_mode="Markdown",reply_markup=mkt_kb)
         return PARTNER_MENU
+
+    # Кнопка "День маркетинга изучен"
+    if text in list(MKT_DONE_BTN.values()):
+        day = mkt_progress_get(user.id)
+        uname = f"@{user.username}" if user.username else str(user.id)
+        new_day = day + 1
+        mkt_progress_set(user.id, new_day)
+        await mkt_progress_sync(user.id, new_day, user.full_name or "", uname)
+        try:
+            await context.bot.send_message(chat_id=MANAGER_CHAT_ID,
+                text=f"📊 Партнёр прошёл маркетинг День {day}\n👤 {user.full_name or uname}\n🆔 {uname}")
+        except Exception as e:
+            logger.error(f"mkt notify: {e}")
+        if new_day > 7:
+            kb = ReplyKeyboardMarkup([[p.get("btn_review_mkt","📖 Просмотреть маркетинг")],[p["btn_back"]]],resize_keyboard=True)
+            await update.message.reply_text(MKT_ALL_DONE.get(lang,MKT_ALL_DONE["ru"]),reply_markup=kb)
+        else:
+            mkt_kb = ReplyKeyboardMarkup([[MKT_DONE_BTN.get(lang,MKT_DONE_BTN["ru"])],[MKT_REPEAT_BTN.get(lang,MKT_REPEAT_BTN["ru"])],[p["btn_back"]]],resize_keyboard=True)
+            ctext = {"ru":f"🎉 День {day} пройден! Открывается День {new_day}:","tk":f"🎉 {day}-nji gün geçildi! {new_day}-nji gün:","uz":f"🎉 {day}-kun o'tildi! {new_day}-kun:"}
+            await update.message.reply_text(ctext.get(lang,ctext["ru"]),reply_markup=mkt_kb)
+            await update.message.reply_text(MKT_DAYS[new_day].get(lang,MKT_DAYS[new_day]["ru"]),parse_mode="Markdown",reply_markup=mkt_kb)
+        return PARTNER_MENU
+
+    # Кнопка "Повторить день маркетинга"
+    if text in list(MKT_REPEAT_BTN.values()):
+        day = max(1, mkt_progress_get(user.id))
+        if day > 7: day = 7
+        mkt_kb = ReplyKeyboardMarkup([[MKT_DONE_BTN.get(lang,MKT_DONE_BTN["ru"])],[MKT_REPEAT_BTN.get(lang,MKT_REPEAT_BTN["ru"])],[p["btn_back"]]],resize_keyboard=True)
+        await update.message.reply_text(MKT_DAYS[day].get(lang,MKT_DAYS[day]["ru"]),parse_mode="Markdown",reply_markup=mkt_kb)
+        return PARTNER_MENU
+
+    # Кнопка "Просмотреть маркетинг"
+    if text == p.get("btn_review_mkt",""):
+        days_list = MKT_REVIEW_DAYS.get(lang,MKT_REVIEW_DAYS["ru"])
+        kb = ReplyKeyboardMarkup([[d] for d in days_list]+[[p["btn_back"]]],resize_keyboard=True)
+        txt = {"ru":"📖 Выберите день маркетинга:","tk":"📖 Marketing gününi saýlaň:","uz":"📖 Marketing kunini tanlang:"}
+        await update.message.reply_text(txt.get(lang,txt["ru"]),reply_markup=kb)
+        context.user_data["reviewing_mkt"] = True
+        return PARTNER_MENU
+
+    # Просмотр дня маркетинга
+    if context.user_data.get("reviewing_mkt"):
+        days_list = MKT_REVIEW_DAYS.get(lang,MKT_REVIEW_DAYS["ru"])
+        if text in days_list:
+            idx = days_list.index(text)+1
+            kb = ReplyKeyboardMarkup([[d] for d in days_list]+[[p["btn_back"]]],resize_keyboard=True)
+            await update.message.reply_text(MKT_DAYS[idx].get(lang,MKT_DAYS[idx]["ru"]),parse_mode="Markdown",reply_markup=kb)
+            return PARTNER_MENU
+        elif text == p["btn_back"]:
+            context.user_data.pop("reviewing_mkt",None)
+
+    # Кнопка "Просмотреть обучение"
+    if text == p.get("btn_review_learn",""):
+        days_list = LEARN_REVIEW_DAYS.get(lang,LEARN_REVIEW_DAYS["ru"])
+        kb = ReplyKeyboardMarkup([[d] for d in days_list]+[[p["btn_back"]]],resize_keyboard=True)
+        txt = {"ru":"📖 Выберите день обучения:","tk":"📖 Okuw gününi saýlaň:","uz":"📖 O'qitish kunini tanlang:"}
+        await update.message.reply_text(txt.get(lang,txt["ru"]),reply_markup=kb)
+        context.user_data["reviewing_learn"] = True
+        return PARTNER_MENU
+
+    # Просмотр дня обучения
+    if context.user_data.get("reviewing_learn"):
+        days_list = LEARN_REVIEW_DAYS.get(lang,LEARN_REVIEW_DAYS["ru"])
+        if text in days_list:
+            idx = days_list.index(text)+1
+            kb = ReplyKeyboardMarkup([[d] for d in days_list]+[[p["btn_back"]]],resize_keyboard=True)
+            await update.message.reply_text(DAYS[idx].get(lang,DAYS[idx]["ru"]),parse_mode="Markdown",reply_markup=kb)
+            return PARTNER_MENU
+        elif text == p["btn_back"]:
+            context.user_data.pop("reviewing_learn",None)
+
+    # Тесты — главное меню тестов
+    if text == p.get("btn_quiz",""):
+        results = quiz_get(user.id)
+        rows = []
+        for qkey in QUIZ_ORDER:
+            qname = QUIZ_NAMES[qkey].get(lang,QUIZ_NAMES[qkey]["ru"])
+            res = results.get(qkey)
+            label = f"{'✅' if res and res['score']==res['total'] else '📝' if res else '🎯'} {qname}{f' ({res[chr(115)+chr(99)+chr(111)+chr(114)+chr(101)]}/{res[chr(116)+chr(111)+chr(116)+chr(97)+chr(108)]})' if res else ''}"
+            rows.append([label])
+        rows.append([p["btn_back"]])
+        kb = ReplyKeyboardMarkup(rows,resize_keyboard=True)
+        txt = {"ru":"🧪 *Тесты*\n\nВыберите тест:","tk":"🧪 *Testler*\n\nTesti saýlaň:","uz":"🧪 *Testlar*\n\nTestni tanlang:"}
+        await update.message.reply_text(txt.get(lang,txt["ru"]),parse_mode="Markdown",reply_markup=kb)
+        context.user_data["in_quiz_menu"] = True
+        return PARTNER_MENU
+
+    # Выбор конкретного теста
+    if context.user_data.get("in_quiz_menu"):
+        for qkey in QUIZ_ORDER:
+            qname = QUIZ_NAMES[qkey].get(lang,QUIZ_NAMES[qkey]["ru"])
+            if qname in text:
+                context.user_data.pop("in_quiz_menu",None)
+                context.user_data["quiz_key"] = qkey
+                import random
+                qs = QUIZ_DATA[qkey].copy()
+                random.shuffle(qs)
+                context.user_data["quiz_qs"]    = qs
+                context.user_data["quiz_q"]     = 0
+                context.user_data["quiz_score"]  = 0
+                return await _quiz_send_question(update, context, lang)
+        if text == p["btn_back"]:
+            context.user_data.pop("in_quiz_menu",None)
 
     # Вебинар — записаться
     if text == p.get("btn_webinar", ""):
@@ -1899,9 +2372,130 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         return PARTNER_MENU
 
     # Любой другой текст — остаёмся в меню
+    context.user_data.pop("reviewing_mkt",None)
+    context.user_data.pop("reviewing_learn",None)
+    context.user_data.pop("in_quiz_menu",None)
     await update.message.reply_text(p["menu_title"], reply_markup=get_partner_kb(lang))
     return PARTNER_MENU
 
+
+
+# ─── Quiz функции ────────────────────────────────────────────
+
+async def _quiz_send_question(update, context, lang):
+    qs  = context.user_data.get("quiz_qs",[])
+    idx = context.user_data.get("quiz_q",0)
+    if idx >= len(qs):
+        return await _quiz_finish(update, context, lang)
+    q   = qs[idx]
+    qt  = q["q"].get(lang, q["q"]["ru"])
+    ops = q["o"].get(lang, q["o"]["ru"])
+    p   = PT.get(lang, PT["ru"])
+    kb  = ReplyKeyboardMarkup([[ops[0]],[ops[1]],[ops[2]],[p["btn_back"]]],resize_keyboard=True)
+    total = len(qs)
+    hdr = {"ru":f"🧪 Вопрос {idx+1}/{total}","tk":f"🧪 {idx+1}/{total} sorag","uz":f"🧪 {idx+1}/{total} savol"}
+    await update.message.reply_text(f"{hdr.get(lang,hdr['ru'])}\n\n{qt}",parse_mode="Markdown",reply_markup=kb)
+    return PARTNER_QUIZ
+
+async def _quiz_finish(update, context, lang):
+    score  = context.user_data.get("quiz_score",0)
+    qkey   = context.user_data.get("quiz_key","")
+    total  = len(context.user_data.get("quiz_qs",[]))
+    user   = update.effective_user
+    uname  = f"@{user.username}" if user.username else str(user.id)
+    p      = PT.get(lang, PT["ru"])
+    quiz_set(user.id, qkey, score, total)
+    await quiz_sync(user.id, qkey, score, total, user.full_name or "", uname)
+    pct    = int(score/total*100) if total else 0
+    emoji  = "🏆" if pct==100 else "✅" if pct>=70 else "📝"
+    comm_ru = "Отлично! Вы отлично знаете тему!" if pct==100 else "Хороший результат!" if pct>=70 else "Рекомендуем повторить материал."
+    comm_tk = "Ajayyp!" if pct==100 else "Gowy netije!" if pct>=70 else "Materialy gaytalamagy maslahat beryaris."
+    comm_uz = "Zor!" if pct==100 else "Yaxshi natija!" if pct>=70 else "Materialni takrorlashni tavsiya etamiz."
+    rtext = {
+        "ru": f"{emoji} *Тест завершён!*\n\nПравильных: {score}/{total} ({pct}%)\n\n{comm_ru}",
+        "tk": f"{emoji} *Test tamamlandy!*\n\nDogry: {score}/{total} ({pct}%)\n\n{comm_tk}",
+        "uz": f"{emoji} *Test yakunlandi!*\n\nTogri: {score}/{total} ({pct}%)\n\n{comm_uz}",
+    }
+    retry = {"ru":"🔁 Пройти заново","tk":"🔁 Täzeden geç","uz":"🔁 Qayta o'tish"}
+    kb = ReplyKeyboardMarkup([[retry.get(lang,retry["ru"])],[p.get("btn_quiz","🧪 Тесты")],[p["btn_back"]]],resize_keyboard=True)
+    await update.message.reply_text(rtext.get(lang,rtext["ru"]),parse_mode="Markdown",reply_markup=kb)
+    for k in ["quiz_key","quiz_q","quiz_qs","quiz_score"]:
+        context.user_data.pop(k,None)
+    return PARTNER_MENU
+
+async def partner_quiz_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    lang  = context.user_data.get("lang","ru")
+    user  = update.effective_user
+    text  = update.message.text
+    p     = PT.get(lang, PT["ru"])
+
+    # Следующий вопрос
+    next_btn = {"ru":"➡️ Следующий","tk":"➡️ Indiki","uz":"➡️ Keyingi"}
+    if text == next_btn.get(lang,next_btn["ru"]):
+        return await _quiz_send_question(update, context, lang)
+
+    # Повторить тест
+    retry = {"ru":"🔁 Пройти заново","tk":"🔁 Täzeden geç","uz":"🔁 Qayta o'tish"}
+    if text == retry.get(lang,retry["ru"]):
+        qkey = context.user_data.get("quiz_key","")
+        if qkey:
+            import random
+            qs = QUIZ_DATA[qkey].copy(); random.shuffle(qs)
+            context.user_data["quiz_qs"]   = qs
+            context.user_data["quiz_q"]    = 0
+            context.user_data["quiz_score"] = 0
+            return await _quiz_send_question(update, context, lang)
+
+    # Выход
+    if text == p["btn_back"] or text == p.get("btn_quiz",""):
+        for k in ["quiz_key","quiz_q","quiz_qs","quiz_score"]:
+            context.user_data.pop(k,None)
+        if text == p.get("btn_quiz",""):
+            results = quiz_get(user.id)
+            rows = []
+            for qkey in QUIZ_ORDER:
+                qname = QUIZ_NAMES[qkey].get(lang,QUIZ_NAMES[qkey]["ru"])
+                res = results.get(qkey)
+                label = f"{'✅' if res and res['score']==res['total'] else '📝' if res else '🎯'} {qname}"
+                if res: label += f" ({res['score']}/{res['total']})"
+                rows.append([label])
+            rows.append([p["btn_back"]])
+            kb = ReplyKeyboardMarkup(rows,resize_keyboard=True)
+            txt = {"ru":"🧪 *Тесты*\n\nВыберите тест:","tk":"🧪 *Testler*\n\nTesti saýlaň:","uz":"🧪 *Testlar*\n\nTestni tanlang:"}
+            await update.message.reply_text(txt.get(lang,txt["ru"]),parse_mode="Markdown",reply_markup=kb)
+            context.user_data["in_quiz_menu"] = True
+            return PARTNER_MENU
+        await update.message.reply_text(p["menu_title"],reply_markup=get_partner_kb(lang))
+        return PARTNER_MENU
+
+    # Проверяем ответ
+    qs  = context.user_data.get("quiz_qs",[])
+    idx = context.user_data.get("quiz_q",0)
+    if idx >= len(qs):
+        return await _quiz_finish(update, context, lang)
+    q   = qs[idx]
+    ops = q["o"].get(lang, q["o"]["ru"])
+    ans = q["a"]
+    exp = q["e"].get(lang, q["e"]["ru"])
+    chosen = None
+    for i, opt in enumerate(ops):
+        if text == opt:
+            chosen = i; break
+    if chosen is None:
+        return await _quiz_send_question(update, context, lang)
+    is_ok = (chosen == ans)
+    if is_ok:
+        context.user_data["quiz_score"] = context.user_data.get("quiz_score",0)+1
+        fb = {"ru":f"✅ *Правильно!*\n\n{exp}","tk":f"✅ *Dogry!*\n\n{exp}","uz":f"✅ *Togri!*\n\n{exp}"}
+    else:
+        fb = {"ru":f"❌ *Неправильно.*\nПравильный ответ: {ops[ans]}\n\n{exp}",
+              "tk":f"❌ *Yalnysh.*\nDogry jogap: {ops[ans]}\n\n{exp}",
+              "uz":f"❌ *Notogri.*\nTogri javob: {ops[ans]}\n\n{exp}"}
+    context.user_data["quiz_q"] = idx+1
+    next_btn2 = {"ru":"➡️ Следующий","tk":"➡️ Indiki","uz":"➡️ Keyingi"}
+    kb = ReplyKeyboardMarkup([[next_btn2.get(lang,next_btn2["ru"])]],resize_keyboard=True)
+    await update.message.reply_text(fb.get(lang,fb["ru"]),parse_mode="Markdown",reply_markup=kb)
+    return PARTNER_QUIZ
 
 async def partner_contacts_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lang = context.user_data.get("lang", "ru")
@@ -2290,6 +2884,7 @@ def main():
             ANKETA_PHONE:          [MessageHandler(filters.TEXT & ~filters.COMMAND, anketa_phone)],
             ANKETA_CITY:           [MessageHandler(filters.TEXT & ~filters.COMMAND, anketa_city)],
             ANKETA_INTEREST:       [MessageHandler(filters.TEXT & ~filters.COMMAND, anketa_interest)],
+            PARTNER_QUIZ:          [MessageHandler(filters.TEXT & ~filters.COMMAND, partner_quiz_handler)],
             ADMIN_MENU:            [
                 MessageHandler(filters.PHOTO, admin_photo_handler),
                 MessageHandler(filters.VIDEO_NOTE, admin_circle_handler),
