@@ -1043,11 +1043,12 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "❌ Yo'q, suhbatni davom ettirish",
         t.get("anketa_no", ""),
     ]
-    if text in YES:
-        return await start_anketa(update, context)
     if text in NO:
         await update.message.reply_text(t["anketa_ok"], reply_markup=get_main_keyboard(lang))
         return CHAT
+    if text in YES:
+        await update.message.reply_text(t["anketa_start"], reply_markup=ReplyKeyboardRemove())
+        return ANKETA_NAME
 
     # Кнопка Узнать больше о доходе
     if text in ["📊 Узнать больше о доходе", "📊 Girdeji barada has köp", "📊 Daromad haqida ko'proq"]:
