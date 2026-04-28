@@ -9,7 +9,7 @@ from telegram.ext import (
 from openai import OpenAI
 
 # ─── Настройки ───────────────────────────────────────────────
-BOT_TOKEN = os.getenv("BOT_TOKEN", "")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "7146960065:AAEncOXgBeMjvUFGoX0f1QGr1_bHIDdK3gQ")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 GOOGLE_SHEET_URL = os.getenv("GOOGLE_SHEET_URL", "https://script.google.com/macros/s/AKfycbzqwkgp8nSXxtSN1VB16QObhcOgqY4ye45-_Xmpc9OgAQnhQLAdL3EcjcSSg8zz05c/exec")
 
@@ -29,7 +29,7 @@ SELECT_COUNTRY, SELECT_LANG, CHAT, ANKETA_NAME, ANKETA_PHONE, ANKETA_CITY, ANKET
 
 user_histories = {}
 
-import json, pathlib, random
+import json, pathlib
 
 # ─── Партнёрская база данных ─────────────────────────────────
 _PARTNERS_F  = pathlib.Path("/tmp/vrt_partners.json")
@@ -38,8 +38,6 @@ _CONTACTS_F  = pathlib.Path("/tmp/vrt_contacts.json")
 _WEBINAR_F   = pathlib.Path("/tmp/vrt_webinar.json")
 _NEWS_F      = pathlib.Path("/tmp/vrt_news.json")
 _PROGRESS_F  = pathlib.Path("/tmp/vrt_progress.json")
-_MKT_PROGRESS_F = pathlib.Path("/tmp/vrt_mkt_progress.json")
-_QUIZ_RESULTS_F = pathlib.Path("/tmp/vrt_quiz_results.json")
 _USERS_F     = pathlib.Path("/tmp/vrt_users.json")
 
 def _jload(p):
@@ -172,69 +170,6 @@ async def progress_load_from_sheets():
     except Exception as e:
         logger.error(f"progress_load: {e}")
 
-# ─── Прогресс маркетинг-обучения и тестов ─────────────────────
-def mkt_progress_get(uid: int) -> int:
-    d = _jload(_MKT_PROGRESS_F)
-    return int(d.get(str(uid), {}).get("day", 0))
-
-def mkt_progress_set(uid: int, day: int):
-    d = _jload(_MKT_PROGRESS_F)
-    d[str(uid)] = {"day": day}
-    _jsave(_MKT_PROGRESS_F, d)
-
-async def mkt_progress_sync_to_sheets(uid: int, day: int, name: str, uname: str):
-    try:
-        async with httpx.AsyncClient(follow_redirects=True) as c:
-            await c.post(GOOGLE_SHEET_URL, json={
-                "type": "mkt_progress",
-                "user_id": str(uid),
-                "name": name,
-                "username": uname,
-                "day": day,
-            }, timeout=10)
-    except Exception as e:
-        logger.error(f"mkt_progress_sync: {e}")
-
-async def mkt_progress_load_from_sheets():
-    try:
-        async with httpx.AsyncClient(follow_redirects=True) as c:
-            resp = await c.post(GOOGLE_SHEET_URL, json={"type": "get_mkt_progress"}, timeout=15)
-            data = resp.json()
-            if data.get("status") == "ok" and data.get("progress"):
-                d = _jload(_MKT_PROGRESS_F)
-                for row in data["progress"]:
-                    uid = str(row.get("user_id", "")).strip()
-                    day = int(row.get("day", 0))
-                    if uid:
-                        d[uid] = {"day": day}
-                _jsave(_MKT_PROGRESS_F, d)
-                logger.info(f"✅ Маркетинг-прогресс {len(data['progress'])} партнёров загружен")
-    except Exception as e:
-        logger.error(f"mkt_progress_load: {e}")
-
-def quiz_result_save(uid: int, quiz_key: str, score: int, total: int):
-    import datetime
-    d = _jload(_QUIZ_RESULTS_F)
-    lst = d.get(str(uid), [])
-    lst.append({"quiz": quiz_key, "score": score, "total": total, "date": datetime.datetime.now().strftime("%d.%m.%Y %H:%M")})
-    d[str(uid)] = lst[-100:]
-    _jsave(_QUIZ_RESULTS_F, d)
-
-async def quiz_result_sync_to_sheets(uid: int, quiz_key: str, score: int, total: int, name: str, uname: str):
-    try:
-        async with httpx.AsyncClient(follow_redirects=True) as c:
-            await c.post(GOOGLE_SHEET_URL, json={
-                "type": "quiz_result",
-                "user_id": str(uid),
-                "quiz": quiz_key,
-                "score": score,
-                "total": total,
-                "name": name,
-                "username": uname,
-            }, timeout=10)
-    except Exception as e:
-        logger.error(f"quiz_result_sync: {e}")
-
 def news_save(text: str):
     """Сохраняет новость."""
     import datetime
@@ -279,10 +214,6 @@ PT = {
         "menu_title":   "🤝 Партнёрское меню — выберите раздел:",
         "btn_learn":    "📚 Обучение",
         "btn_market":   "📊 Маркетинг",
-        "btn_tests":     "🧪 Тесты",
-        "btn_motivation":"🔥 Доход и рост",
-        "btn_review_learn":"📖 Просмотреть обучение",
-        "btn_review_mkt":"📖 Просмотреть маркетинг",
         "btn_webinar":  "📅 Записаться на вебинар",
         "webinar_ask":   "📅 *ZOOM-вебинар с наставником*\n\nВы можете записаться на вебинар с вышестоящим наставником и его командой.\n\nНа вебинаре:\n• Разбор маркетинга и бонусов\n• Ответы на вопросы\n• Знакомство с командой\n• Первые шаги в бизнесе\n\nВведите ваше *имя и удобное время* для записи:",
         "webinar_ok":    "✅ Заявка на вебинар отправлена! Менеджер свяжется с вами для подтверждения.",
@@ -335,10 +266,6 @@ PT = {
         "menu_title":   "🤝 Hyzmatdaş menýusy — bölüm saýlaň:",
         "btn_learn":    "📚 Okuw",
         "btn_market":   "📊 Marketing",
-        "btn_tests":     "🧪 Testler",
-        "btn_motivation":"🔥 Girdeji we ösüş",
-        "btn_review_learn":"📖 Okuwy görmek",
-        "btn_review_mkt":"📖 Marketingi görmek",
         "btn_webinar":  "📅 Webinara ýazylmak",
         "webinar_ask":   "📅 *Halypa bilen ZOOM-webinar*\n\nÝokary derejeli halypa we onuň topary bilen webinara ýazylyp bilersiňiz.\n\nWebinarda:\n• Marketing we bonuslary düşündirmek\n• Soraglara jogap bermek\n• Topar bilen tanyşmak\n• Işde ilkinji ädimler\n\nÝazylmak üçin *adyňyzy we amatly wagtyňyzy* giriziň:",
         "webinar_ok":    "✅ Webinar üçin ýüz tutma iberildi! Menejer tassyklamak üçin siz bilen habarlaşar.",
@@ -391,10 +318,6 @@ PT = {
         "menu_title":   "🤝 Hamkorlik menyusi — bo'limni tanlang:",
         "btn_learn":    "📚 O'qitish",
         "btn_market":   "📊 Marketing",
-        "btn_tests":     "🧪 Testlar",
-        "btn_motivation":"🔥 Daromad va o‘sish",
-        "btn_review_learn":"📖 O‘qitishni ko‘rish",
-        "btn_review_mkt":"📖 Marketingni ko‘rish",
         "btn_webinar":  "📅 Vebinarga yozilish",
         "webinar_ask":   "📅 *Murabbiy bilan ZOOM-vebinar*\n\nYuqori darajadagi murabbiy va uning jamoasi bilan vebinarga yozilishingiz mumkin.\n\nVebinarda:\n• Marketing va bonuslarni tushuntirish\n• Savollarga javob berish\n• Jamoa bilan tanishish\n• Biznesda birinchi qadamlar\n\nYozilish uchun *ismingiz va qulay vaqtingizni* kiriting:",
         "webinar_ok":    "✅ Vebinar uchun ariza yuborildi! Menejer tasdiqlash uchun siz bilan bog'lanadi.",
@@ -443,8 +366,6 @@ def get_partner_kb(lang):
     p = PT.get(lang, PT["ru"])
     return ReplyKeyboardMarkup(
         [[p["btn_learn"],    p["btn_market"]],
-         [p["btn_tests"],    p["btn_motivation"]],
-         [p["btn_review_learn"], p["btn_review_mkt"]],
          [p["btn_contacts"], p["btn_webinar"]],
          [p["btn_news"]],
          [p["btn_back"]]],
@@ -871,7 +792,6 @@ async def _load_partners_impl(app=None):
     except Exception as e:
         logger.error(f"load_partners error: {e}")
     await progress_load_from_sheets()
-    await mkt_progress_load_from_sheets()
     await users_load_from_sheets()
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1802,165 +1722,12 @@ LEARN_FULL = {
     ),
 }
 
-# ─── Маркетинг 7 дней, тесты и мотивация ─────────────────────
-MKT_DAYS = {
-    1: {"ru": "📊 *Маркетинг. День 1 — язык системы*\n\nСегодня разбираем основу: *PV, UE, ЛО и ГО*.\n\n*PV* — баллы продукта. Через PV считается активность, квалификация и командный объём.\n*UE* — условная единица для расчёта бонусов.\n*ЛО* — личный объём: ваши личные покупки/заказы.\n*ГО* — групповой объём: объём вашей структуры.\n\n💡 Главная мысль: в Vertera доход строится не от обещаний, а от товарооборота команды.\n\n*Задание:* объясните новичку своими словами: что такое PV и зачем нужна активность."},
-    2: {"ru": "⚡ *Маркетинг. День 2 — активность*\n\nБез активности система не раскрывается.\n\n*Личная активность 20 PV* — базовый вход в движение.\n*Лидерская активность 40 PV* — позиция человека, который строит команду.\n*Бинарная активность* нужна, чтобы получать командные бонусы по двум веткам.\n\n💡 Активность — это не расход. Это подтверждение, что партнёр сам пользуется продуктом и имеет моральное право рекомендовать.\n\n*Задание:* проверьте свою активность и активность ближайших партнёров."},
-    3: {"ru": "💰 *Маркетинг. День 3 — БЗП*\n\n*БЗП — бонус за приглашение партнёра.*\nВы получаете *40%* с покупки партнёра первой линии по правилам плана.\n\nВажно:\n1️⃣ Партнёр должен быть в вашей первой линии.\n2️⃣ Нужна корректная регистрация.\n3️⃣ Не теряйте людей: сразу помогайте им сделать первый заказ и понять следующий шаг.\n\n💡 БЗП — быстрый бонус, который показывает новичку: система реально платит за действие.\n\n*Задание:* подготовьте список из 3 людей, которым можно объяснить первый доход через БЗП."},
-    4: {"ru": "🏆 *Маркетинг. День 4 — клубная система*\n\nКлубная система мотивирует строить первую линию и товарооборот.\n\n*Клуб 120* и *Клуб 220* — это уровни, где партнёр получает дополнительные возможности и бонусы за активность структуры.\n\n*Кэшбэк до 100%* — сильный аргумент для партнёра: продукт можно не просто покупать, а выстраивать вокруг него систему рекомендаций.\n\n💡 Показывайте клубную систему не как сложную таблицу, а как игру роста: сделал объём — получил следующий уровень.\n\n*Задание:* объясните новичку клубную систему за 60 секунд."},
-    5: {"ru": "🌳 *Маркетинг. День 5 — бинар и КББ*\n\nБинар — это две ветки: левая и правая.\n\n*КББ* начисляется, когда в двух ветках закрываются циклы по правилам маркетинг-плана. Базовая логика: объём должен идти с двух сторон.\n\nСтатусы *Gold / Platinum / Premium* усиливают возможности получения командного бонуса.\n\n💡 Ошибка новичков — строить только одну ветку. Лидер с первых дней думает о балансе.\n\n*Задание:* нарисуйте две ветки и отметьте, кого можно поставить слева и справа."},
-    6: {"ru": "💎 *Маркетинг. День 6 — квалификации и БЗК*\n\nКвалификации показывают рост партнёра: *Гранат → Рубин → Изумруд → Сапфир → Бриллиант → Национальный Лидер*.\n\n*БЗК* — бонус за квалификацию: разовая выплата при достижении нового статуса по условиям плана.\n\n💡 Квалификация — это не название. Это показатель стабильного товарооборота, глубины команды и лидерства.\n\n*Задание:* выберите ближайшую квалификацию и запишите, какой объём и какие люди нужны для её достижения."},
-    7: {"ru": "🚀 *Маркетинг. День 7 — бонус наставника и бустер*\n\nНаставник зарабатывает не только на личных действиях, но и на развитии команды.\n\n*Бонус наставника* может доходить до сильных процентов с команды по условиям плана.\n*Бустер* усиливает партнёра при первом достижении квалификации и помогает быстрее почувствовать результат.\n\n💡 Главная формула: обучил человека → он сделал результат → команда растёт → доход становится системным.\n\n*Задание:* выберите 2 новичков, которым вы поможете пройти первые 7 дней."},
-}
-
-MKT_DONE_BTN = {"ru": "✅ Маркетинг пройден! Следующий день", "tk": "✅ Dowam et", "uz": "✅ Keyingi kun"}
-MKT_REPEAT_BTN = {"ru": "🔁 Повторить день маркетинга", "tk": "🔁 Gaýtala", "uz": "🔁 Takrorlash"}
-MKT_ALL_DONE = {"ru": "🏆 Вы прошли 7 дней маркетинга! Теперь вы понимаете систему дохода намного глубже. Нажмите «📖 Просмотреть маркетинг», чтобы повторить любой день.", "tk": "🏆 Marketing tamamlandy!", "uz": "🏆 Marketing tugadi!"}
-
-MOTIVATION_TEXT = {
-    "ru": (
-        "🔥 *Доход и рост в Vertera*\n\n"
-        "Главная идея: доход появляется не от желания, а от системы действий.\n\n"
-        "*Простой путь роста:*\n"
-        "1️⃣ 2 активных партнёра — начало бинарной структуры.\n"
-        "2️⃣ 5 активных партнёров — первые стабильные встречи и оборот.\n"
-        "3️⃣ 10 активных партнёров — появляется ядро команды.\n"
-        "4️⃣ 20+ активных партнёров — начинается лидерская система.\n\n"
-        "*Путь квалификаций:*\n"
-        "Новичок → Гранат → Рубин → Изумруд → Сапфир → Бриллиант → Национальный Лидер.\n\n"
-        "💡 Почему одни растут, а другие нет?\n"
-        "Побеждает не самый умный, а тот, кто каждый день делает простые действия: список, приглашение, встреча, сопровождение, обучение новичка.\n\n"
-        "🚀 Ваша задача — не уговорить всех. Ваша задача — найти тех, кому Vertera нужна именно сейчас."
-    ),
-    "tk": "🔥 *Girdeji we ösüş*\n\nHer gün ýönekeý hereketler: sanaw, çakylyk, duşuşyk, goldaw.",
-    "uz": "🔥 *Daromad va o‘sish*\n\nHar kuni oddiy harakatlar: ro‘yxat, taklif, uchrashuv, yordam."
-}
-
-QUIZZES = {
-    "products": {
-        "title": "🧪 Тест 1 — Продукты Vertera",
-        "questions": [
-            {"q":"Что является основой многих продуктов Vertera?", "a":["Бурые морские водоросли","Синтетические витамины","Молочный белок"], "c":0, "e":"Основа Vertera — натуральные продукты из бурых морских водорослей."},
-            {"q":"Как правильно позиционировать продукты Vertera?", "a":["Как лекарство","Как продукты питания и поддержку рациона","Как замену врачу"], "c":1, "e":"Важно говорить: продукты питания, не лекарства, без медицинских обещаний."},
-            {"q":"Что часто подчёркивается в Forte?", "a":["Ламинария, фукус и дигидрокверцетин","Только сахар","Кофеин"], "c":0, "e":"Forte построен на ламинарии, фукусе и дигидрокверцетине."},
-            {"q":"Smart Kid предназначен для кого?", "a":["Для детей от 3 лет","Только для спортсменов","Только для пожилых"], "c":0, "e":"Smart Kid — детское питание, обычно позиционируется для детей от 3 лет."},
-            {"q":"Plasma Therapy — это направление...", "a":["Косметики","Автомасел","Спортивной одежды"], "c":0, "e":"Plasma Therapy — косметическая линия Vertera."},
-            {"q":"Как лучше продавать продукт новичку?", "a":["Обещать лечение","Дать попробовать и объяснить состав","Давить страхом"], "c":1, "e":"Личный опыт и корректное объяснение состава продают сильнее давления."},
-            {"q":"Что нельзя говорить о продукте?", "a":["Поддерживает рацион","Лечит болезни","Натуральный продукт"], "c":1, "e":"Нельзя давать медицинские обещания и говорить, что продукт лечит."},
-        ]
-    },
-    "marketing": {
-        "title": "🧪 Тест 2 — Маркетинг и бонусы",
-        "questions": [
-            {"q":"Что такое PV?", "a":["Баллы продукта","Номер телефона","Название склада"], "c":0, "e":"PV — Product Value, баллы продукта."},
-            {"q":"Что такое ЛО?", "a":["Личный объём","Личный отпуск","Лидерский отчёт"], "c":0, "e":"ЛО — личный объём партнёра."},
-            {"q":"БЗП связан с...", "a":["Покупкой партнёра первой линии","Цветом упаковки","Погодой"], "c":0, "e":"БЗП — быстрый бонус за действия в первой линии."},
-            {"q":"Для бинарной системы важно...", "a":["Строить две ветки","Писать только одному человеку","Не приглашать никого"], "c":0, "e":"Бинар требует развития двух веток."},
-            {"q":"Квалификация показывает...", "a":["Рост структуры и объёма","Возраст партнёра","Город проживания"], "c":0, "e":"Квалификация — показатель объёма, структуры и лидерства."},
-            {"q":"Активность партнёра нужна чтобы...", "a":["Подтвердить участие в системе","Скрыть результат","Удалить кабинет"], "c":0, "e":"Активность подтверждает, что партнёр включён в систему."},
-            {"q":"Главный источник стабильного дохода — это...", "a":["Случайность","Системная команда и товарооборот","Одна продажа в год"], "c":1, "e":"Стабильность появляется через команду, повторные действия и товарооборот."},
-        ]
-    },
-    "newbies": {
-        "title": "🧪 Тест 3 — Работа с новичками",
-        "questions": [
-            {"q":"Что должен сделать новичок в первый день?", "a":["Составить список и отправить первые приглашения","Ждать неделю","Спорить с людьми"], "c":0, "e":"Первые действия важны в первые 72 часа."},
-            {"q":"Лучший формат первой встречи?", "a":["Новичок один объясняет всё","Новичок + наставник","Только переписка без встречи"], "c":1, "e":"Наставник помогает правильно показать систему и снять страх."},
-            {"q":"Как реагировать на “нет”?", "a":["Ругаться","Спокойно предложить короткую информацию","Удалить контакт"], "c":1, "e":"Каждое “нет” — часть статистики. Спокойствие сохраняет контакт."},
-            {"q":"Что фиксируем на 4 день?", "a":["Цифры: написал, ответили, пришли","Только настроение","Цвет одежды"], "c":0, "e":"Лидер смотрит на цифры, а не только на эмоции."},
-            {"q":"Зачем видео результата на 7 день?", "a":["Закрепить веру и показать движение","Просто занять память телефона","Ни зачем"], "c":0, "e":"Видео результата усиливает веру новичка и команды."},
-        ]
-    }
-}
-
-def quiz_menu_kb(lang):
-    return ReplyKeyboardMarkup(
-        [["🧪 Тест 1: Продукты"], ["🧪 Тест 2: Маркетинг"], ["🧪 Тест 3: Новички"], [PT.get(lang, PT["ru"])["btn_back"]]],
-        resize_keyboard=True
-    )
-
-def answer_kb():
-    return ReplyKeyboardMarkup([["А", "Б", "В"], ["🔙 Выйти из теста"]], resize_keyboard=True)
-
-def start_quiz_session(context, quiz_key: str):
-    qs = list(QUIZZES[quiz_key]["questions"])
-    random.shuffle(qs)
-    context.user_data["quiz"] = {"key": quiz_key, "qs": qs, "i": 0, "score": 0}
-
-async def send_quiz_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    st = context.user_data.get("quiz")
-    q = st["qs"][st["i"]]
-    num = st["i"] + 1
-    total = len(st["qs"])
-    text = f"{QUIZZES[st['key']]['title']}\n\n*Вопрос {num}/{total}:*\n{q['q']}\n\nА) {q['a'][0]}\nБ) {q['a'][1]}\nВ) {q['a'][2]}"
-    await update.message.reply_text(text, parse_mode="Markdown", reply_markup=answer_kb())
-
 async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка кнопок внутри партнёрского меню."""
     lang = context.user_data.get("lang", "ru")
     user = update.effective_user
     text = update.message.text
     p    = PT.get(lang, PT["ru"])
-
-    # Активный тест: принимаем ответы А/Б/В
-    if context.user_data.get("quiz"):
-        if text == "🔙 Выйти из теста":
-            context.user_data.pop("quiz", None)
-            await update.message.reply_text("Тест остановлен.", reply_markup=get_partner_kb(lang))
-            return PARTNER_MENU
-        if text in ["А", "Б", "В", "A", "B", "C"]:
-            st = context.user_data["quiz"]
-            q = st["qs"][st["i"]]
-            idx_map = {"А": 0, "A": 0, "Б": 1, "B": 1, "В": 2, "C": 2}
-            chosen = idx_map[text]
-            correct = chosen == q["c"]
-            if correct:
-                st["score"] += 1
-            answer_word = "✅ Правильно!" if correct else f"❌ Неправильно. Правильный ответ: {'АБВ'[q['c']]}"
-            await update.message.reply_text(f"{answer_word}\n\n💡 {q['e']}", reply_markup=answer_kb())
-            st["i"] += 1
-            if st["i"] >= len(st["qs"]):
-                score = st["score"]
-                total = len(st["qs"])
-                quiz_key = st["key"]
-                context.user_data.pop("quiz", None)
-                quiz_result_save(user.id, quiz_key, score, total)
-                uname = f"@{user.username}" if user.username else str(user.id)
-                await quiz_result_sync_to_sheets(user.id, quiz_key, score, total, user.full_name or "", uname)
-                percent = round(score / total * 100)
-                if percent >= 85:
-                    grade = "🔥 Отлично! Можно объяснять другим."
-                elif percent >= 60:
-                    grade = "👍 Хорошо, но стоит повторить материал."
-                else:
-                    grade = "⚠️ Нужно повторить обучение и пройти тест заново."
-                await update.message.reply_text(
-                    f"🏁 *Тест завершён!*\n\nРезультат: *{score}/{total}* ({percent}%)\n{grade}\n\nМожно пройти заново — вопросы будут в другом порядке.",
-                    parse_mode="Markdown",
-                    reply_markup=quiz_menu_kb(lang)
-                )
-                return PARTNER_MENU
-            context.user_data["quiz"] = st
-            await send_quiz_question(update, context)
-            return PARTNER_MENU
-        await update.message.reply_text("Ответьте кнопкой: А, Б или В.", reply_markup=answer_kb())
-        return PARTNER_MENU
-
-    # Просмотр конкретного дня обучения/маркетинга
-    if text.startswith("📚 День "):
-        try:
-            day = int(text.replace("📚 День ", "").strip())
-            await update.message.reply_text(DAYS[day].get(lang, DAYS[day]["ru"]), parse_mode="Markdown", reply_markup=get_partner_kb(lang))
-        except Exception:
-            await update.message.reply_text("Не смог открыть день.", reply_markup=get_partner_kb(lang))
-        return PARTNER_MENU
-    if text.startswith("📊 День "):
-        try:
-            day = int(text.replace("📊 День ", "").strip())
-            await update.message.reply_text(MKT_DAYS[day].get(lang, MKT_DAYS[day]["ru"]), parse_mode="Markdown", reply_markup=get_partner_kb(lang))
-        except Exception:
-            await update.message.reply_text("Не смог открыть день.", reply_markup=get_partner_kb(lang))
-        return PARTNER_MENU
 
     # Выход
     if text == p["btn_back"]:
@@ -2050,69 +1817,13 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_text(day_text, parse_mode="Markdown", reply_markup=learn_kb)
         return PARTNER_MENU
 
-    # Маркетинг — 7 дней с прогрессом
+    # Маркетинг — с PV и товарооборотом
     if text == p["btn_market"]:
-        day = mkt_progress_get(user.id)
-        if day == 0:
-            mkt_progress_set(user.id, 1)
-            await mkt_progress_sync_to_sheets(user.id, 1, user.full_name or "", f"@{user.username}" if user.username else str(user.id))
-            day = 1
-        if day > 7:
-            await update.message.reply_text(MKT_ALL_DONE.get(lang, MKT_ALL_DONE["ru"]), reply_markup=get_partner_kb(lang))
-            return PARTNER_MENU
-        mkt_kb = ReplyKeyboardMarkup([[MKT_DONE_BTN.get(lang, MKT_DONE_BTN["ru"])], [MKT_REPEAT_BTN.get(lang, MKT_REPEAT_BTN["ru"])], [p["btn_back"]]], resize_keyboard=True)
-        await update.message.reply_text(MKT_DAYS[day].get(lang, MKT_DAYS[day]["ru"]), parse_mode="Markdown", reply_markup=mkt_kb)
-        return PARTNER_MENU
-
-    # Кнопка маркетинг выполнен
-    if text in list(MKT_DONE_BTN.values()):
-        day = mkt_progress_get(user.id)
-        if day >= 7:
-            mkt_progress_set(user.id, 8)
-            await mkt_progress_sync_to_sheets(user.id, 8, user.full_name or "", f"@{user.username}" if user.username else str(user.id))
-            await update.message.reply_text(MKT_ALL_DONE.get(lang, MKT_ALL_DONE["ru"]), reply_markup=get_partner_kb(lang))
-            return PARTNER_MENU
-        new_day = day + 1 if day else 1
-        mkt_progress_set(user.id, new_day)
-        await mkt_progress_sync_to_sheets(user.id, new_day, user.full_name or "", f"@{user.username}" if user.username else str(user.id))
-        mkt_kb = ReplyKeyboardMarkup([[MKT_DONE_BTN.get(lang, MKT_DONE_BTN["ru"])], [MKT_REPEAT_BTN.get(lang, MKT_REPEAT_BTN["ru"])], [p["btn_back"]]], resize_keyboard=True)
-        await update.message.reply_text(f"🎉 День {day} маркетинга пройден! Открывается День {new_day}:", reply_markup=mkt_kb)
-        await update.message.reply_text(MKT_DAYS[new_day].get(lang, MKT_DAYS[new_day]["ru"]), parse_mode="Markdown", reply_markup=mkt_kb)
-        return PARTNER_MENU
-
-    # Повторить день маркетинга
-    if text in list(MKT_REPEAT_BTN.values()):
-        day = mkt_progress_get(user.id) or 1
-        if day > 7:
-            await update.message.reply_text(MKT_ALL_DONE.get(lang, MKT_ALL_DONE["ru"]), reply_markup=get_partner_kb(lang))
-            return PARTNER_MENU
-        mkt_kb = ReplyKeyboardMarkup([[MKT_DONE_BTN.get(lang, MKT_DONE_BTN["ru"])], [MKT_REPEAT_BTN.get(lang, MKT_REPEAT_BTN["ru"])], [p["btn_back"]]], resize_keyboard=True)
-        await update.message.reply_text(MKT_DAYS[day].get(lang, MKT_DAYS[day]["ru"]), parse_mode="Markdown", reply_markup=mkt_kb)
-        return PARTNER_MENU
-
-    # Тесты
-    if text == p.get("btn_tests"):
-        await update.message.reply_text("🧪 Выберите тест. После каждого вопроса я сразу покажу правильный ответ и объяснение.", reply_markup=quiz_menu_kb(lang))
-        return PARTNER_MENU
-    if text in ["🧪 Тест 1: Продукты", "🧪 Тест 2: Маркетинг", "🧪 Тест 3: Новички"]:
-        key = {"🧪 Тест 1: Продукты":"products", "🧪 Тест 2: Маркетинг":"marketing", "🧪 Тест 3: Новички":"newbies"}[text]
-        start_quiz_session(context, key)
-        await send_quiz_question(update, context)
-        return PARTNER_MENU
-
-    # Мотивация
-    if text == p.get("btn_motivation"):
-        await update.message.reply_text(MOTIVATION_TEXT.get(lang, MOTIVATION_TEXT["ru"]), parse_mode="Markdown", reply_markup=get_partner_kb(lang))
-        return PARTNER_MENU
-
-    # Просмотр обучения и маркетинга
-    if text == p.get("btn_review_learn"):
-        kb = ReplyKeyboardMarkup([[f"📚 День {i}" for i in range(1,4)], [f"📚 День {i}" for i in range(4,8)], [p["btn_back"]]], resize_keyboard=True)
-        await update.message.reply_text("📖 Выберите день обучения для просмотра:", reply_markup=kb)
-        return PARTNER_MENU
-    if text == p.get("btn_review_mkt"):
-        kb = ReplyKeyboardMarkup([[f"📊 День {i}" for i in range(1,4)], [f"📊 День {i}" for i in range(4,8)], [p["btn_back"]]], resize_keyboard=True)
-        await update.message.reply_text("📖 Выберите день маркетинга для просмотра:", reply_markup=kb)
+        await update.message.reply_text(
+            MARKET_FULL.get(lang, MARKET_FULL["ru"]),
+            parse_mode="Markdown",
+            reply_markup=get_partner_kb(lang)
+        )
         return PARTNER_MENU
 
     # Вебинар — записаться
