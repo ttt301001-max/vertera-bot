@@ -277,7 +277,7 @@ PT = {
         "rejected":     "❌ Запрос отклонён. Свяжитесь с менеджером: @tach_ttt",
         "already":      "🤝 Вы уже в команде! Открываю партнёрское меню...",
         "menu_title":   "🤝 Партнёрское меню — выберите раздел:",
-        "btn_learn":    "📚 Обучение",
+        "btn_learn":    "📚 Обучение для новичков",
         "btn_market":   "📊 Маркетинг",
         "btn_webinar":  "📅 Записаться на вебинар",
         "webinar_ask":   "📅 *ZOOM-вебинар с наставником*\n\nВы можете записаться на вебинар с вышестоящим наставником и его командой.\n\nНа вебинаре:\n• Разбор маркетинга и бонусов\n• Ответы на вопросы\n• Знакомство с командой\n• Первые шаги в бизнесе\n\nВведите ваше *имя и удобное время* для записи:",
@@ -289,6 +289,8 @@ PT = {
         "btn_contacts": "👥 Мои контакты",
         "btn_news":     "📣 Новости",
         "btn_quiz":         "🧪 Тесты",
+        "btn_academy":      "🎓 Академия гомеостаза",
+        "btn_my_results":   "📊 Мои результаты тестов",
         "btn_review_learn": "📖 Просмотреть обучение",
         "btn_review_mkt":   "📖 Просмотреть маркетинг",
         "btn_back":     "🔙 Выйти из меню партнёра",
@@ -332,7 +334,7 @@ PT = {
         "rejected":     "❌ Isleg ret edildi. Menejer bilen habarlaşyň: @tach_ttt",
         "already":      "🤝 Siz eýýäm toparda! Hyzmatdaş menýusyny açýaryn...",
         "menu_title":   "🤝 Hyzmatdaş menýusy — bölüm saýlaň:",
-        "btn_learn":    "📚 Okuw",
+        "btn_learn":    "📚 Täze başlanlar üçin okuw",
         "btn_market":   "📊 Marketing",
         "btn_webinar":  "📅 Webinara ýazylmak",
         "webinar_ask":   "📅 *Halypa bilen ZOOM-webinar*\n\nÝokary derejeli halypa we onuň topary bilen webinara ýazylyp bilersiňiz.\n\nWebinarda:\n• Marketing we bonuslary düşündirmek\n• Soraglara jogap bermek\n• Topar bilen tanyşmak\n• Işde ilkinji ädimler\n\nÝazylmak üçin *adyňyzy we amatly wagtyňyzy* giriziň:",
@@ -344,6 +346,8 @@ PT = {
         "btn_contacts": "👥 Meniň kontaktlarym",
         "btn_news":     "📣 Habarlar",
         "btn_quiz":         "🧪 Testler",
+        "btn_academy":      "🎓 Gomeostaz akademiýasy",
+        "btn_my_results":   "📊 Meniň test netijeleri",
         "btn_review_learn": "📖 Okuwы syn etmek",
         "btn_review_mkt":   "📖 Marketingi syn etmek",
         "btn_back":     "🔙 Hyzmatdaş menýusyndan çyk",
@@ -387,7 +391,7 @@ PT = {
         "rejected":     "❌ So'rov rad etildi. Menejer bilan bog'laning: @tach_ttt",
         "already":      "🤝 Siz allaqachon jamoasidasiz! Hamkorlik menyusini ochaman...",
         "menu_title":   "🤝 Hamkorlik menyusi — bo'limni tanlang:",
-        "btn_learn":    "📚 O'qitish",
+        "btn_learn":    "📚 Yangilar uchun o'qitish",
         "btn_market":   "📊 Marketing",
         "btn_webinar":  "📅 Vebinarga yozilish",
         "webinar_ask":   "📅 *Murabbiy bilan ZOOM-vebinar*\n\nYuqori darajadagi murabbiy va uning jamoasi bilan vebinarga yozilishingiz mumkin.\n\nVebinarda:\n• Marketing va bonuslarni tushuntirish\n• Savollarga javob berish\n• Jamoa bilan tanishish\n• Biznesda birinchi qadamlar\n\nYozilish uchun *ismingiz va qulay vaqtingizni* kiriting:",
@@ -399,6 +403,8 @@ PT = {
         "btn_contacts": "👥 Mening kontaktlarim",
         "btn_news":     "📣 Yangiliklar",
         "btn_quiz":         "🧪 Testlar",
+        "btn_academy":      "🎓 Gomeostaz akademiyasi",
+        "btn_my_results":   "📊 Mening test natijalarim",
         "btn_review_learn": "📖 O'qitishni ko'rish",
         "btn_review_mkt":   "📖 Marketingni ko'rish",
         "btn_back":     "🔙 Hamkorlik menyusidan chiqish",
@@ -440,9 +446,9 @@ def get_partner_kb(lang):
     p = PT.get(lang, PT["ru"])
     return ReplyKeyboardMarkup(
         [[p["btn_learn"],    p["btn_market"]],
-         [p["btn_quiz"],     p["btn_contacts"]],
-         [p["btn_webinar"],  p["btn_news"]],
-         [p["btn_back"]]],
+         [p["btn_academy"],  p["btn_quiz"]],
+         [p["btn_contacts"], p["btn_webinar"]],
+         [p["btn_news"],     p["btn_back"]]],
         resize_keyboard=True
     )
 
@@ -1621,6 +1627,39 @@ QUIZ_DATA = {
         {"q":{"ru":"1 UE в Туркменистане?","tk":"Türkmenistanda 1 UE?","uz":"Turkmanistonda 1 UE?"},
          "o":{"ru":["А) 10 манат","Б) 15 манат","В) 20 манат"],"tk":["A) 10 manat","B) 15 manat","C) 20 manat"],"uz":["A) 10 manat","B) 15 manat","V) 20 manat"]},
          "a":1,"e":{"ru":"1 UE = 15 манат (TKM), 10 000 сум (UZB).","tk":"1 UE = 15 manat (TKM).","uz":"1 UE = 15 manat (TKM)."}},
+        {"q":{"ru":"Что такое Spillover в бинаре?","tk":"Binarda Spillover näme?","uz":"Binarda Spillover nima?"},
+         "o":{"ru":["А) Тип продукта","Б) Перелив партнёров от вышестоящих в вашу структуру","В) Ежемесячный бонус"],"tk":["A) Önüm görnüşi","B) Ýokary hyzmatdaşlardan geçirilme","C) Aýlyk bonus"],"uz":["A) Mahsulot turi","B) Yuqoridagi hamkorlardan o'tkazish","V) Oylik bonus"]},
+         "a":1,"e":{"ru":"Spillover — вышестоящие наставники могут размещать партнёров в вашу структуру.","tk":"Spillover — ýokary hyzmatdaşlar olary siziň gurluşyňyza ýerleşdirip biler.","uz":"Spillover — yuqoridagi hamkorlar odamlarni sizning tuzilmangizga joylashtirishi mumkin."}},
+        {"q":{"ru":"Бустер бонус — это дополнительные сколько % к КББ?","tk":"Buster bonus KBB-e goşmaça näçe %?","uz":"Buster bonus KBB ga qo'shimcha necha %?"},
+         "o":{"ru":["А) 10%","Б) 20%","В) 35%"],"tk":["A) 10%","B) 20%","C) 35%"],"uz":["A) 10%","B) 20%","V) 35%"]},
+         "a":1,"e":{"ru":"Бустер бонус = +20% к КББ при первом достижении квалификации от D3 и выше.","tk":"Buster bonus = KBB-e +20%.","uz":"Buster bonus = KBB ga +20%."}},
+        {"q":{"ru":"При каком условии кэшбэк аннулируется?","tk":"Kэşbэk haçan ýok edilýär?","uz":"Keshbek qachon bekor qilinadi?"},
+         "o":{"ru":["А) Через 30 дней","Б) Через 90 дней без использования","В) Никогда"],"tk":["A) 30 günden","B) 90 günden soň ulanymasaň","C) Hiçbir wagt"],"uz":["A) 30 kundan keyin","B) 90 kun ishlatmasangiz","V) Hech qachon"]},
+         "a":1,"e":{"ru":"Кэшбэк аннулируется через 90 дней без покупок с использованием кэшбэка.","tk":"Kэşbэk 90 günden soň ulanymasaň ýok edilýär.","uz":"Keshbek 90 kun ishlatmasangiz bekor qilinadi."}},
+        {"q":{"ru":"БЗК для квалификации Гранат?","tk":"Granat derejeli BZK?","uz":"Granat malakali BZK?"},
+         "o":{"ru":["А) 100 UE","Б) 150 UE","В) 233 UE"],"tk":["A) 100 UE","B) 150 UE","C) 233 UE"],"uz":["A) 100 UE","B) 150 UE","V) 233 UE"]},
+         "a":1,"e":{"ru":"Гранат = 150 UE в месяц.","tk":"Granat = aýda 150 UE.","uz":"Granat = oyda 150 UE."}},
+        {"q":{"ru":"Лимит КББ для статуса GOLD в неделю?","tk":"GOLD statusy üçin hepdelik KBB limiti?","uz":"GOLD statusi uchun haftalik KBB limiti?"},
+         "o":{"ru":["А) 200 UE","Б) 500 UE","В) 1000 UE"],"tk":["A) 200 UE","B) 500 UE","C) 1000 UE"],"uz":["A) 200 UE","B) 500 UE","V) 1000 UE"]},
+         "a":1,"e":{"ru":"GOLD: лимит 500 UE в неделю, 2000 UE в месяц.","tk":"GOLD: hepdelik limit 500 UE.","uz":"GOLD: haftalik limit 500 UE."}},
+        {"q":{"ru":"Что означает ЛО в системе Vertera?","tk":"Vertera ulgamynda ÝO näme?","uz":"Vertera tizimida LO nima?"},
+         "o":{"ru":["А) Линейный объём","Б) Личный объём","В) Лидерский оборот"],"tk":["A) Liniýa göwrümi","B) Şahsy göwrüm","C) Lider dolanyşygy"],"uz":["A) Chiziqli hajm","B) Shaxsiy hajm","V) Lider aylanmasi"]},
+         "a":1,"e":{"ru":"ЛО = Личный объём — сумма PV ваших личных покупок за месяц.","tk":"ÝO = Şahsy göwrüm — aýdaky şahsy satyn alyşlaryňyzyň PV jemi.","uz":"LO = Shaxsiy hajm — oylik shaxsiy xaridlaringizning PV yig'indisi."}},
+        {"q":{"ru":"Бинарная активность: минимум сколько партнёров в каждой ветке?","tk":"Binar işjeňligi: her şahada iň az näçe hyzmatdaş?","uz":"Binar faolligi: har tarmoqda kamida nechta hamkor?"},
+         "o":{"ru":["А) 1","Б) 2","В) 3"],"tk":["A) 1","B) 2","C) 3"],"uz":["A) 1","B) 2","V) 3"]},
+         "a":0,"e":{"ru":"Бинарная активность: по 1 лично приглашённому партнёру в каждой ветке с ЛО 20 PV.","tk":"Binar işjeňligi: her şahada 1 hyzmatdaş, 20 PV ÝO.","uz":"Binar faolligi: har tarmoqda 1 hamkor, 20 PV LO."}},
+        {"q":{"ru":"Какой % КББ у статуса PLATINUM?","tk":"PLATINUM statusynyň KBB göterimi?","uz":"PLATINUM statusining KBB foizi?"},
+         "o":{"ru":["А) 20%","Б) 25%","В) 35%"],"tk":["A) 20%","B) 25%","C) 35%"],"uz":["A) 20%","B) 25%","V) 35%"]},
+         "a":1,"e":{"ru":"PLATINUM = 25% = 10 UE за цикл.","tk":"PLATINUM = 25% = sikl üçin 10 UE.","uz":"PLATINUM = 25% = sikl uchun 10 UE."}},
+        {"q":{"ru":"При каком ГОБ партнёр получает квалификацию Сапфир?","tk":"Haýsy GOB-da Sapfir derejesi berilýär?","uz":"Qaysi GOB da Zangori malakasi beriladi?"},
+         "o":{"ru":["А) 2000 PV","Б) 5000 PV","В) 15000 PV"],"tk":["A) 2000 PV","B) 5000 PV","C) 15000 PV"],"uz":["A) 2000 PV","B) 5000 PV","V) 15000 PV"]},
+         "a":1,"e":{"ru":"Сапфир: ЛО 40 PV + ГОБ 5000 PV.","tk":"Sapfir: ÝO 40 PV + GOB 5000 PV.","uz":"Zangori: LO 40 PV + GOB 5000 PV."}},
+        {"q":{"ru":"Сколько UE в месяц лимит для PREMIUM?","tk":"PREMIUM üçin aýlyk UE limiti?","uz":"PREMIUM uchun oylik UE limiti?"},
+         "o":{"ru":["А) 80 000 UE","Б) 200 000 UE","В) 500 000 UE"],"tk":["A) 80 000 UE","B) 200 000 UE","C) 500 000 UE"],"uz":["A) 80 000 UE","B) 200 000 UE","V) 500 000 UE"]},
+         "a":1,"e":{"ru":"PREMIUM: лимит 50 000 UE/нед, 200 000 UE/мес.","tk":"PREMIUM: limit aýda 200 000 UE.","uz":"PREMIUM: limit oyda 200 000 UE."}},
+        {"q":{"ru":"Клуб 120: сколько % покупок от новых клиентов?","tk":"Klub 120: täze müşderilerden näçe %?","uz":"Klub 120: yangi mijozlardan necha %?"},
+         "o":{"ru":["А) 10%","Б) 25%","В) 50%"],"tk":["A) 10%","B) 25%","C) 50%"],"uz":["A) 10%","B) 25%","V) 50%"]},
+         "a":1,"e":{"ru":"Клуб 120: 25% (30 PV) от объёма первой линии должны быть от новых клиентов.","tk":"Klub 120: 25% täze müşderilerden.","uz":"Klub 120: 25% yangi mijozlardan."}},
     ],
     "work": [
         {"q":{"ru":"Сколько приглашений нужно в День 1?","tk":"1-nji günde näçe çakylyk?","uz":"1-kunda nechta taklif?"},
@@ -1639,6 +1678,73 @@ QUIZ_DATA = {
          "o":{"ru":["А) День 3","Б) День 5","В) День 7"],"tk":["A) 3-nji gün","B) 5-nji gün","C) 7-nji gün"],"uz":["A) 3-kun","B) 5-kun","V) 7-kun"]},
          "a":1,"e":{"ru":"День 5 — создать веру через первый результат.","tk":"5-nji gün — ilkinji netije.","uz":"5-kun — birinchi natija."}},
     ],
+}
+
+
+# ══════════════════════════════════════════════════════════════
+# АКАДЕМИЯ ГОМЕОСТАЗА VERTERA
+# ══════════════════════════════════════════════════════════════
+ACADEMY_CONTENT = {
+    "ru": (
+        "🎓 *Академия гомеостаза Vertera*\n\n"
+        "Академия гомеостаза — это образовательная платформа компании Vertera, "
+        "созданная для глубокого изучения принципов здоровья и баланса организма.\n\n"
+        "📚 *Что такое гомеостаз?*\n"
+        "Гомеостаз — это способность организма поддерживать стабильное внутреннее состояние "
+        "несмотря на внешние изменения. Это баланс всех систем: иммунной, пищеварительной, "
+        "сердечно-сосудистой и других.\n\n"
+        "🌊 *Роль водорослей в гомеостазе:*\n"
+        "• Ламинария и фукус содержат более 140 биоактивных веществ\n"
+        "• Йод, магний, кальций, витамины поддерживают баланс систем\n"
+        "• Полисахариды водорослей стимулируют иммунитет\n"
+        "• Антиоксиданты защищают клетки от повреждений\n\n"
+        "🔬 *Технология PLASMA:*\n"
+        "Уникальная технология Vertera преобразует активные вещества водорослей "
+        "в наночастицы, которые проникают в клетки напрямую. "
+        "Биодоступность в 3-5 раз выше обычных продуктов.\n\n"
+        "📖 *Программы академии:*\n"
+        "• Основы нутрициологии и здорового питания\n"
+        "• Детокс и очищение организма\n"
+        "• Укрепление иммунитета\n"
+        "• Здоровье сердечно-сосудистой системы\n"
+        "• Детское питание и развитие\n\n"
+        "🌿 Академия гомеостаза Vertera — это ваш путь к глубокому пониманию "
+        "здоровья и возможность стать экспертом в области натурального питания!"
+    ),
+    "tk": (
+        "🎓 *Vertera Gomeostaz akademiýasy*\n\n"
+        "Gomeostaz akademiýasy — bedeniň saglygyny we deňagramlylygyny çuňňur öwrenmek üçin "
+        "Vertera kompaniýasynyň döredilen bilim platformasy.\n\n"
+        "📚 *Gomeostaz näme?*\n"
+        "Gomeostaz — bedeniň daşarky üýtgeşmelere garamazdan durnukly içki ýagdaýyny saklamak "
+        "ukyby. Bu ähli ulgamlaryň deňagramlylygy: immunitet, siňdiriş, ýürek-damar we beýlekiler.\n\n"
+        "🌊 *Suw ösümlikleriniň gomeostazda roly:*\n"
+        "• Laminariýa we fukus 140+ bioaktiw madda öz içine alýar\n"
+        "• Ýod, magniý, kalsiý, witaminler ulgam deňagramlylygyny saklaýar\n"
+        "• Suw ösümlikleriniň polisakaridleri immuniteti güýçlendirýär\n"
+        "• Antioksidantlar öýjükleri goraýar\n\n"
+        "🔬 *PLASMA tehnologiýasy:*\n"
+        "Vertera-nyň özboluşly tehnologiýasy suw ösümlikleriniň işjeň maddalaryny "
+        "nanozarryjalara öwürýär. Biodostuplugy adaty önümlerden 3-5 esse ýokary.\n\n"
+        "🌿 Vertera Gomeostaz akademiýasy — saglygy çuňňur düşünmek ýoluňyz!"
+    ),
+    "uz": (
+        "🎓 *Vertera Gomeostaz akademiyasi*\n\n"
+        "Gomeostaz akademiyasi — organizm salomatligi va muvozanatini chuqur o'rganish uchun "
+        "Vertera kompaniyasining ta'lim platformasi.\n\n"
+        "📚 *Gomeostaz nima?*\n"
+        "Gomeostaz — organizmning tashqi o'zgarishlarga qaramasdan barqaror ichki holatini "
+        "saqlash qobiliyati. Bu barcha tizimlarning balansi: immunitet, hazm, yurak-tomir va boshqalar.\n\n"
+        "🌊 *Suv o'tlarining gomeostazda roli:*\n"
+        "• Laminaria va fukus 140+ bioaktiv modda o'z ichiga oladi\n"
+        "• Yod, magniy, kaltsiy, vitaminlar tizim balansini saqlaydi\n"
+        "• Suv o'tlarining polisakaridlari immunitetni kuchaytiradi\n"
+        "• Antioksidantlar hujayralarni himoya qiladi\n\n"
+        "🔬 *PLASMA texnologiyasi:*\n"
+        "Vertera ning noyob texnologiyasi suv o'tlarining faol moddalarini nanozarrachalar "
+        "ga aylantiradi. Biodostuplik oddiy mahsulotlardan 3-5 marta yuqori.\n\n"
+        "🌿 Vertera Gomeostaz akademiyasi — sog'likni chuqur tushunish yo'lingiz!"
+    ),
 }
 
 MARKET_FULL = {
@@ -2180,6 +2286,15 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_text(day_text, parse_mode="Markdown", reply_markup=learn_kb)
         return PARTNER_MENU
 
+    # Академия гомеостаза
+    if text == p.get("btn_academy",""):
+        await update.message.reply_text(
+            ACADEMY_CONTENT.get(lang, ACADEMY_CONTENT["ru"]),
+            parse_mode="Markdown",
+            reply_markup=get_partner_kb(lang)
+        )
+        return PARTNER_MENU
+
     # Маркетинг — 7 дней с прогрессом
     if text == p["btn_market"]:
         day = mkt_progress_get(user.id)
@@ -2271,19 +2386,43 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         results = quiz_get(user.id)
         rows = []
         for qkey in QUIZ_ORDER:
-            qname = QUIZ_NAMES[qkey].get(lang,QUIZ_NAMES[qkey]["ru"])
+            qname = QUIZ_NAMES[qkey].get(lang, QUIZ_NAMES[qkey]["ru"])
             res = results.get(qkey)
-            label = f"{'✅' if res and res['score']==res['total'] else '📝' if res else '🎯'} {qname}{f' ({res[chr(115)+chr(99)+chr(111)+chr(114)+chr(101)]}/{res[chr(116)+chr(111)+chr(116)+chr(97)+chr(108)]})' if res else ''}"
+            if res:
+                label = f"{'✅' if res['score']==res['total'] else '📝'} {qname} ({res['score']}/{res['total']})"
+            else:
+                label = f"🎯 {qname}"
             rows.append([label])
+        rows.append([p.get("btn_my_results","📊 Мои результаты тестов")])
         rows.append([p["btn_back"]])
         kb = ReplyKeyboardMarkup(rows,resize_keyboard=True)
-        txt = {"ru":"🧪 *Тесты*\n\nВыберите тест:","tk":"🧪 *Testler*\n\nTesti saýlaň:","uz":"🧪 *Testlar*\n\nTestni tanlang:"}
+        txt = {"ru":"🧪 *Тесты*\n\nВыберите тест для прохождения:","tk":"🧪 *Testler*\n\nTesti saýlaň:","uz":"🧪 *Testlar*\n\nTestni tanlang:"}
         await update.message.reply_text(txt.get(lang,txt["ru"]),parse_mode="Markdown",reply_markup=kb)
         context.user_data["in_quiz_menu"] = True
         return PARTNER_MENU
 
     # Выбор конкретного теста
     if context.user_data.get("in_quiz_menu"):
+        my_res_btns = [PT[l].get("btn_my_results","") for l in PT]
+        if text in my_res_btns:
+            context.user_data.pop("in_quiz_menu",None)
+            results = quiz_get(user.id)
+            lines = []
+            for qkey in QUIZ_ORDER:
+                qname = QUIZ_NAMES[qkey].get(lang,QUIZ_NAMES[qkey]["ru"])
+                res = results.get(qkey)
+                if res:
+                    pct = int(res["score"]/res["total"]*100) if res["total"] else 0
+                    em = "🏆" if pct==100 else "✅" if pct>=70 else "📝"
+                    lines.append(f"{em} {qname}: {res['score']}/{res['total']} ({pct}%)")
+                else:
+                    no_txt = {"ru":"не пройден","tk":"geçilmedi","uz":"o\'tilmadi"}
+                    lines.append(f"⭕ {qname}: {no_txt.get(lang,no_txt['ru'])}")
+            hdr = {"ru":"📊 *Мои результаты тестов:*","tk":"📊 *Meniň test netijeleri:*","uz":"📊 *Mening test natijalarim:*"}
+            tip = {"ru":"\n\n💡 Нажмите на тест чтобы пройти снова.","tk":"\n\n💡 Täzeden geçmek üçin teste basyň.","uz":"\n\n💡 Qayta o\'tish uchun testni bosing."}
+            msg = hdr.get(lang,hdr["ru"]) + "\n\n" + "\n".join(lines) + tip.get(lang,tip["ru"])
+            await update.message.reply_text(msg,parse_mode="Markdown",reply_markup=get_partner_kb(lang))
+            return PARTNER_MENU
         for qkey in QUIZ_ORDER:
             qname = QUIZ_NAMES[qkey].get(lang,QUIZ_NAMES[qkey]["ru"])
             if qname in text:
@@ -2292,6 +2431,7 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
                 import random
                 qs = QUIZ_DATA[qkey].copy()
                 random.shuffle(qs)
+                qs = qs[:10]  # максимум 10 вопросов
                 context.user_data["quiz_qs"]    = qs
                 context.user_data["quiz_q"]     = 0
                 context.user_data["quiz_score"]  = 0
@@ -2440,7 +2580,9 @@ async def partner_quiz_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         qkey = context.user_data.get("quiz_key","")
         if qkey:
             import random
-            qs = QUIZ_DATA[qkey].copy(); random.shuffle(qs)
+            qs = QUIZ_DATA[qkey].copy()
+            random.shuffle(qs)
+            qs = qs[:10]  # максимум 10 вопросов
             context.user_data["quiz_qs"]   = qs
             context.user_data["quiz_q"]    = 0
             context.user_data["quiz_score"] = 0
@@ -2456,9 +2598,12 @@ async def partner_quiz_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             for qkey in QUIZ_ORDER:
                 qname = QUIZ_NAMES[qkey].get(lang,QUIZ_NAMES[qkey]["ru"])
                 res = results.get(qkey)
-                label = f"{'✅' if res and res['score']==res['total'] else '📝' if res else '🎯'} {qname}"
-                if res: label += f" ({res['score']}/{res['total']})"
+                if res:
+                    label = f"{'✅' if res['score']==res['total'] else '📝'} {qname} ({res['score']}/{res['total']})"
+                else:
+                    label = f"🎯 {qname}"
                 rows.append([label])
+            rows.append([p.get("btn_my_results","📊 Мои результаты тестов")])
             rows.append([p["btn_back"]])
             kb = ReplyKeyboardMarkup(rows,resize_keyboard=True)
             txt = {"ru":"🧪 *Тесты*\n\nВыберите тест:","tk":"🧪 *Testler*\n\nTesti saýlaň:","uz":"🧪 *Testlar*\n\nTestni tanlang:"}
