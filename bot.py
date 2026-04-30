@@ -1580,103 +1580,156 @@ QUIZ_NAMES = {
     "work":      {"ru":"Работа с новичками","tk":"Täze adamlar bilen iş","uz":"Yangilar bilan ishlash"},
 }
 QUIZ_ORDER = ["products","marketing","work"]
-
 QUIZ_DATA = {
     "products": [
-        {"q":{"ru":"Что является основным компонентом Vertera Gel?","tk":"Vertera Gel-iň esasy düzümi näme?","uz":"Vertera Gel ning asosiy tarkibi nima?"},
+        {"q":{"ru":"Что является основным компонентом Vertera Gel?","tk":"Vertera Gel esasy düzümi?","uz":"Vertera Gel asosiy tarkibi?"},
          "o":{"ru":["А) Спирулина","Б) Ламинария","В) Хлорелла"],"tk":["A) Spirulina","B) Laminariýa","C) Hlorella"],"uz":["A) Spirulina","B) Laminaria","V) Xlorella"]},
-         "a":1,"e":{"ru":"Vertera Gel создан на основе ламинарии — бурой морской водоросли.","tk":"Vertera Gel laminariýa esasynda döredildi.","uz":"Vertera Gel laminaria asosida yaratilgan."}},
-        {"q":{"ru":"Какой pH у Vertera Forte Original?","tk":"Vertera Forte Original-yň pH-y näçe?","uz":"Vertera Forte Original ning pH darajasi qancha?"},
-         "o":{"ru":["А) 5.0","Б) 7.9","В) 8.5"],"tk":["A) 5.0","B) 7.9","C) 8.5"],"uz":["A) 5.0","B) 7.9","V) 8.5"]},
-         "a":2,"e":{"ru":"Vertera Forte Original имеет pH 8.5.","tk":"Vertera Forte Original pH 8.5.","uz":"Vertera Forte Original pH 8.5."}},
-        {"q":{"ru":"С какого возраста можно употреблять Умный ребёнок?","tk":"Akylly çagany haçandan ulanyp bolýar?","uz":"Aqlli bolani necha yoshdan iste'mol qilish mumkin?"},
-         "o":{"ru":["А) с 1 года","Б) с 3 лет","В) с 6 лет"],"tk":["A) 1 ýaşdan","B) 3 ýaşdan","C) 6 ýaşdan"],"uz":["A) 1 yoshdan","B) 3 yoshdan","V) 6 yoshdan"]},
-         "a":1,"e":{"ru":"Умный ребёнок для детей от 3 лет.","tk":"Akylly çaga 3 ýaşdan.","uz":"Aqlli bola 3 yoshdan."}},
-        {"q":{"ru":"Сколько клинических исследований прошёл Vertera Gel?","tk":"Vertera Gel näçe kliniki syndan geçdi?","uz":"Vertera Gel nechta klinik tadqiqotdan o'tgan?"},
-         "o":{"ru":["А) 3","Б) 6","В) 10"],"tk":["A) 3","B) 6","C) 10"],"uz":["A) 3","B) 6","V) 10"]},
-         "a":1,"e":{"ru":"Vertera Gel прошёл 6 клинических исследований.","tk":"Vertera Gel 6 syndan geçdi.","uz":"Vertera Gel 6 ta tadqiqotdan o'tgan."}},
-        {"q":{"ru":"Какой продукт направлен на здоровье сосудов?","tk":"Haýsy önüm damar saglygy üçin?","uz":"Qaysi mahsulot tomir salomatligi uchun?"},
-         "o":{"ru":["А) Vertera Gel","Б) AngioLive","В) Smart Kid"],"tk":["A) Vertera Gel","B) AngioLive","C) Smart Kid"],"uz":["A) Vertera Gel","B) AngioLive","V) Smart Kid"]},
-         "a":1,"e":{"ru":"AngioLive с экстрактом красного винограда для здоровья сосудов.","tk":"AngioLive damar saglygy üçin.","uz":"AngioLive tomir salomatligi uchun."}},
-        {"q":{"ru":"Какая технология используется в косметике Vertera?","tk":"Vertera kosmetikasynda haýsy tehnologiýa?","uz":"Vertera kosmetikasida qaysi texnologiya?"},
-         "o":{"ru":["А) Nano Tech","Б) Plasma Technology","В) Bio Matrix"],"tk":["A) Nano Tech","B) Plasma Technology","C) Bio Matrix"],"uz":["A) Nano Tech","B) Plasma Technology","V) Bio Matrix"]},
-         "a":1,"e":{"ru":"Vertera использует Plasma Technology.","tk":"Vertera Plasma Technology ulanýar.","uz":"Vertera Plasma Technology dan foydalanadi."}},
-        {"q":{"ru":"Сколько полезных веществ в Умном ребёнке?","tk":"Akylly çagada näçe peýdaly madda?","uz":"Aqlli bolada qancha foydali modda?"},
+         "a":1,"e":{"ru":"Vertera Gel создан на основе ламинарии — бурой морской водоросли.","tk":"Laminariýa esasy düzüm.","uz":"Laminaria asosiy tarkib."}},
+        {"q":{"ru":"Сколько биоактивных веществ содержат водоросли Vertera?","tk":"Vertera suw ösümliklerinde näçe bioaktiw madda?","uz":"Vertera suv o'tlarida nechta bioaktiv modda?"},
          "o":{"ru":["А) 50+","Б) 100+","В) 140+"],"tk":["A) 50+","B) 100+","C) 140+"],"uz":["A) 50+","B) 100+","V) 140+"]},
-         "a":2,"e":{"ru":"Умный ребёнок содержит 140+ полезных веществ.","tk":"Akylly çaga 140+ madda.","uz":"Aqlli bola 140+ foydali modda."}},
+         "a":2,"e":{"ru":"Водоросли содержат более 140 биологически активных веществ.","tk":"140+ bioaktiw madda.","uz":"140+ bioaktiv modda."}},
+        {"q":{"ru":"Какой pH у Vertera Forte Original?","tk":"Vertera Forte Original pH?","uz":"Vertera Forte Original pH darajasi?"},
+         "o":{"ru":["А) 5.0","Б) 7.9","В) 8.5"],"tk":["A) 5.0","B) 7.9","C) 8.5"],"uz":["A) 5.0","B) 7.9","V) 8.5"]},
+         "a":2,"e":{"ru":"Vertera Forte Original имеет щелочной pH 8.5.","tk":"pH 8.5.","uz":"pH 8.5."}},
+        {"q":{"ru":"С какого возраста рекомендован Умный ребёнок?","tk":"Akylly çaga haçandan?","uz":"Aqlli bola necha yoshdan?"},
+         "o":{"ru":["А) с 1 года","Б) с 3 лет","В) с 6 лет"],"tk":["A) 1 ýaşdan","B) 3 ýaşdan","C) 6 ýaşdan"],"uz":["A) 1 yoshdan","B) 3 yoshdan","V) 6 yoshdan"]},
+         "a":1,"e":{"ru":"Умный ребёнок предназначен для детей от 3 лет.","tk":"3 ýaşdan.","uz":"3 yoshdan."}},
+        {"q":{"ru":"Для чего предназначен AngioLive?","tk":"AngioLive nämä niýetlenen?","uz":"AngioLive nima uchun?"},
+         "o":{"ru":["А) Для суставов","Б) Для здоровья сосудов","В) Для кожи"],"tk":["A) Bogunlar","B) Damar saglygy","C) Deri"],"uz":["A) Bo'g'imlar","B) Tomir salomatligi","V) Teri"]},
+         "a":1,"e":{"ru":"AngioLive — для здоровья сосудов и вен.","tk":"AngioLive — damar saglygy üçin.","uz":"AngioLive — tomir salomatligi uchun."}},
+        {"q":{"ru":"Какая технология в косметике Vertera?","tk":"Vertera kosmetikasynda tehnologiýa?","uz":"Vertera kosmetikasida texnologiya?"},
+         "o":{"ru":["А) Nano Tech","Б) Plasma Technology","В) Bio Matrix"],"tk":["A) Nano Tech","B) Plasma Technology","C) Bio Matrix"],"uz":["A) Nano Tech","B) Plasma Technology","V) Bio Matrix"]},
+         "a":1,"e":{"ru":"Vertera использует Plasma Technology — биодоступность в 3-5 раз выше.","tk":"Plasma Technology — 3-5 esse ýokary.","uz":"Plasma Technology — 3-5 marta yuqori."}},
+        {"q":{"ru":"Сколько клинических исследований у Vertera Gel?","tk":"Vertera Gel kliniki synlary?","uz":"Vertera Gel klinik tadqiqotlari?"},
+         "o":{"ru":["А) 3","Б) 6","В) 10"],"tk":["A) 3","B) 6","C) 10"],"uz":["A) 3","B) 6","V) 10"]},
+         "a":1,"e":{"ru":"Vertera Gel прошёл 6 клинических исследований.","tk":"6 kliniki syn.","uz":"6 ta klinik tadqiqot."}},
+        {"q":{"ru":"Что такое PLASMA технология?","tk":"PLASMA tehnologiýasy näme?","uz":"PLASMA texnologiyasi nima?"},
+         "o":{"ru":["А) Система нагрева","Б) Гидролизат водорослей в наночастицах","В) Витаминный комплекс"],"tk":["A) Gyzdyryş","B) Nanozarryjalardaky gidrolizat","C) Witamin toplum"],"uz":["A) Isitish","B) Nanozarrachalardagi gidrolizat","V) Vitamin kompleks"]},
+         "a":1,"e":{"ru":"PLASMA — гидролизат водорослей в наночастицах для максимальной биодоступности.","tk":"PLASMA — nanozarryjalardaky gidrolizat.","uz":"PLASMA — nanozarrachalardagi gidrolizat."}},
+        {"q":{"ru":"Для чего ArtroPlast?","tk":"ArtroPlast nämä?","uz":"ArtroPlast nima uchun?"},
+         "o":{"ru":["А) Похудение","Б) Здоровье суставов","В) Иммунитет"],"tk":["A) Aryklamak","B) Bogun saglygy","C) Immunitet"],"uz":["A) Ozish","B) Bo'g'im salomatligi","V) Immunitet"]},
+         "a":1,"e":{"ru":"ArtroPlast содержит глюкозамин и хондроитин для здоровья суставов.","tk":"ArtroPlast — bogun saglygy üçin.","uz":"ArtroPlast — bo'g'im salomatligi uchun."}},
+        {"q":{"ru":"На чём основан Sea Honey?","tk":"Sea Honey nämä esasynda?","uz":"Sea Honey nima asosida?"},
+         "o":{"ru":["А) Пчелиный воск","Б) Морские водоросли и натуральный мёд","В) Морская соль"],"tk":["A) Mum","B) Deňiz ösümlikleri we bal","C) Deňiz duzy"],"uz":["A) Mum","B) Dengiz o'tlari va tabiiy asal","V) Dengiz tuzi"]},
+         "a":1,"e":{"ru":"Sea Honey — морские водоросли (ламинария, фукус), мёд и прополис.","tk":"Sea Honey — deňiz ösümlikleri we bal.","uz":"Sea Honey — dengiz o'tlari va asal."}},
+        {"q":{"ru":"Что содержит Hydrate Collagen?","tk":"Hydrate Collagen düzümi?","uz":"Hydrate Collagen tarkibi?"},
+         "o":{"ru":["А) Синтетический коллаген","Б) Коллаген пресноводной рыбы и ионы серебра","В) Коллаген морских животных"],"tk":["A) Sintetiki kollagen","B) Süýdemsiz balyk kollageni we kümüş","C) Deňiz haýwanlar kollageni"],"uz":["A) Sintetik kollagen","B) Chuchuk baliq kollageni va kumush","V) Dengiz hayvonlari kollageni"]},
+         "a":1,"e":{"ru":"Hydrate Collagen — коллаген пресноводной рыбы и ионы серебра.","tk":"Süýdemsiz balyk kollageni we kümüş ionlary.","uz":"Chuchuk baliq kollageni va kumush ionlari."}},
+        {"q":{"ru":"Из каких водорослей получают PLASMA?","tk":"PLASMA haýsy suw ösümliginden?","uz":"PLASMA qaysi suv o'tidan?"},
+         "o":{"ru":["А) Зелёных","Б) Бурых (ламинария и фукус)","В) Красных"],"tk":["A) Ýaşyl","B) Goňur (laminariýa we fukus)","C) Gyzyl"],"uz":["A) Yashil","B) Jigarrang (laminaria va fukus)","V) Qizil"]},
+         "a":1,"e":{"ru":"PLASMA из бурых морских водорослей — ламинарии и фукуса.","tk":"Goňur suw ösümliklerden.","uz":"Jigarrang suv o'tlaridan."}},
+        {"q":{"ru":"Что такое биодоступность?","tk":"Biodostupluk näme?","uz":"Biodostuplik nima?"},
+         "o":{"ru":["А) Срок хранения","Б) Степень усвоения активных веществ","В) Количество калорий"],"tk":["A) Saklanyş möhleti","B) Siňim derejesi","C) Kaloriýa"],"uz":["A) Saqlash muddati","B) O'zlashtirish darajasi","V) Kaloriya"]},
+         "a":1,"e":{"ru":"Биодоступность — степень усвоения активных веществ. У Vertera в 3-5 раз выше.","tk":"Siňim derejesi. Verterada 3-5 esse ýokary.","uz":"O'zlashtirish darajasi. Verterada 3-5 marta yuqori."}},
+        {"q":{"ru":"Все продукты Vertera — это?","tk":"Ähli Vertera önümleri?","uz":"Barcha Vertera mahsulotlari?"},
+         "o":{"ru":["А) Лекарства","Б) Натуральные продукты питания","В) Витамины"],"tk":["A) Dermanlar","B) Tebigy iýmit önümleri","C) Witaminler"],"uz":["A) Dorilar","B) Tabiiy oziq-ovqat mahsulotlari","V) Vitaminlar"]},
+         "a":1,"e":{"ru":"Все продукты Vertera — натуральные продукты питания, не лекарства.","tk":"Tebigy iýmit önümleridir.","uz":"Tabiiy oziq-ovqat mahsulotlaridir."}},
+        {"q":{"ru":"Для чего Plasma Therapy?","tk":"Plasma Therapy nämä?","uz":"Plasma Therapy nima uchun?"},
+         "o":{"ru":["А) Похудение","Б) Омоложение и восстановление кожи","В) Суставы"],"tk":["A) Aryklamak","B) Ýaşartmak we dikeltmek","C) Bogunlar"],"uz":["A) Ozish","B) Yoshartish va tiklash","V) Bo'g'imlar"]},
+         "a":1,"e":{"ru":"Plasma Therapy — косметика для омоложения и восстановления кожи.","tk":"Ýaşartmak we dikeltmek.","uz":"Yoshartish va tiklash."}},
+        {"q":{"ru":"В каком году основана Vertera?","tk":"Vertera haçan döredildi?","uz":"Vertera qachon tashkil topgan?"},
+         "o":{"ru":["А) 2010","Б) 2014","В) 2018"],"tk":["A) 2010","B) 2014","C) 2018"],"uz":["A) 2010","B) 2014","V) 2018"]},
+         "a":1,"e":{"ru":"Vertera основана в 2014 году, представлена в 15+ странах.","tk":"2014-nji ýylda döredildi.","uz":"2014 yilda tashkil topgan."}},
+        {"q":{"ru":"Что входит в Collagen+C?","tk":"Collagen+C düzüminde näme?","uz":"Collagen+C tarkibida nima?"},
+         "o":{"ru":["А) Только витамин С","Б) Коллаген и витамин С","В) Коллаген и кальций"],"tk":["A) C witamini","B) Kollagen we C witamini","C) Kollagen we kalsiý"],"uz":["A) C vitamini","B) Kollagen va C vitamini","V) Kollagen va kaltsiy"]},
+         "a":1,"e":{"ru":"Collagen+C — коллаген в сочетании с витамином С для лучшего усвоения.","tk":"Kollagen + C witamini.","uz":"Kollagen + C vitamini."}},
+        {"q":{"ru":"Для чего Thalasso Spa Gel?","tk":"Thalasso Spa Gel nämä?","uz":"Thalasso Spa Gel nima uchun?"},
+         "o":{"ru":["А) Суставы","Б) Уход за телом и расслабление","В) Иммунитет"],"tk":["A) Bogunlar","B) Beden idegi we dynç alyş","C) Immunitet"],"uz":["A) Bo'g'imlar","B) Tana parvarishi va bo'shashish","V) Immunitet"]},
+         "a":1,"e":{"ru":"Thalasso Spa Gel — уход за телом, расслабление, улучшение кожи.","tk":"Beden idegi we dynç alyş.","uz":"Tana parvarishi va bo'shashish."}},
+        {"q":{"ru":"Что такое Vertera Forte Apple?","tk":"Vertera Forte Apple näme?","uz":"Vertera Forte Apple nima?"},
+         "o":{"ru":["А) Сок яблока","Б) Vertera Gel со вкусом яблока, pH 8.5","В) Витамины"],"tk":["A) Alma suwy","B) Alma tagamly Vertera Gel, pH 8.5","C) Witaminler"],"uz":["A) Olma sharbati","B) Olma ta'mli Vertera Gel, pH 8.5","V) Vitaminlar"]},
+         "a":1,"e":{"ru":"Vertera Forte Apple — Vertera Gel со вкусом яблока, pH 8.5.","tk":"Alma tagamly Vertera Gel, pH 8.5.","uz":"Olma ta'mli Vertera Gel, pH 8.5."}},
+        {"q":{"ru":"Сколько стран представляет Vertera?","tk":"Vertera näçe ýurtda?","uz":"Vertera nechta mamlakatda?"},
+         "o":{"ru":["А) 5+","Б) 10+","В) 15+"],"tk":["A) 5+","B) 10+","C) 15+"],"uz":["A) 5+","B) 10+","V) 15+"]},
+         "a":2,"e":{"ru":"Сегодня продукция Vertera представлена в 15+ странах мира.","tk":"15+ ýurtda.","uz":"15+ mamlakatda."}},
     ],
     "marketing": [
-        {"q":{"ru":"Сколько % составляет БЗП?","tk":"BZP näçe göterim?","uz":"BZP necha foiz?"},
+        {"q":{"ru":"Сколько % составляет БЗП?","tk":"BZP göterimi?","uz":"BZP foizi?"},
          "o":{"ru":["А) 20%","Б) 30%","В) 40%"],"tk":["A) 20%","B) 30%","C) 40%"],"uz":["A) 20%","B) 30%","V) 40%"]},
-         "a":2,"e":{"ru":"БЗП = 40% от PV покупки партнёров первой линии.","tk":"BZP = 40%.","uz":"BZP = 40%."}},
-        {"q":{"ru":"Минимальный ЛО для личной активности?","tk":"Şahsy işjeňlik üçin minimal ÝO?","uz":"Shaxsiy faollik uchun minimal LO?"},
+         "a":2,"e":{"ru":"БЗП = 40% от PV покупки первой линии.","tk":"BZP = 40%.","uz":"BZP = 40%."}},
+        {"q":{"ru":"Минимальный ЛО для личной активности?","tk":"Şahsy işjeňlik ÝO?","uz":"Shaxsiy faollik LO?"},
          "o":{"ru":["А) 10 PV","Б) 20 PV","В) 40 PV"],"tk":["A) 10 PV","B) 20 PV","C) 40 PV"],"uz":["A) 10 PV","B) 20 PV","V) 40 PV"]},
-         "a":1,"e":{"ru":"Личная активность = покупка от 20 PV.","tk":"Şahsy işjeňlik = 20 PV.","uz":"Shaxsiy faollik = 20 PV."}},
-        {"q":{"ru":"Сколько UE даёт Клуб 220?","tk":"Klub 220 näçe UE berýär?","uz":"Klub 220 necha UE beradi?"},
+         "a":1,"e":{"ru":"Личная активность = 20 PV.","tk":"Şahsy işjeňlik = 20 PV.","uz":"Shaxsiy faollik = 20 PV."}},
+        {"q":{"ru":"Клуб 220 в месяц?","tk":"Klub 220 aýda?","uz":"Klub 220 oyda?"},
          "o":{"ru":["А) 55 UE","Б) 100 UE","В) 110 UE"],"tk":["A) 55 UE","B) 100 UE","C) 110 UE"],"uz":["A) 55 UE","B) 100 UE","V) 110 UE"]},
-         "a":2,"e":{"ru":"Клуб 220 = 110 UE в месяц.","tk":"Klub 220 = 110 UE aýda.","uz":"Klub 220 = 110 UE oyda."}},
-        {"q":{"ru":"PV для закрытия 1 цикла КББ с каждой стороны?","tk":"KBB 1 siklini ýapmak üçin her tarapdan?","uz":"KBB 1 siklini yopish uchun har tomondan?"},
+         "a":2,"e":{"ru":"Клуб 220 = 110 UE/мес.","tk":"Klub 220 = 110 UE aýda.","uz":"Klub 220 = 110 UE oyda."}},
+        {"q":{"ru":"PV для 1 цикла КББ с каждой стороны?","tk":"KBB 1 sikl her tarapdan?","uz":"KBB 1 sikl har tomondan?"},
          "o":{"ru":["А) 20 PV","Б) 40 PV","В) 100 PV"],"tk":["A) 20 PV","B) 40 PV","C) 100 PV"],"uz":["A) 20 PV","B) 40 PV","V) 100 PV"]},
-         "a":1,"e":{"ru":"1 цикл = 40 PV слева + 40 PV справа.","tk":"1 sikl = 40 PV çep + 40 PV sag.","uz":"1 sikl = 40 PV chap + 40 PV o'ng."}},
-        {"q":{"ru":"КББ со статусом PREMIUM за 1 цикл?","tk":"PREMIUM statusy bilen KBB 1 sikl üçin?","uz":"PREMIUM statusi bilan KBB 1 sikl uchun?"},
+         "a":1,"e":{"ru":"1 цикл = 40 PV слева + 40 PV справа.","tk":"40 PV çep + 40 PV sag.","uz":"40 PV chap + 40 PV o'ng."}},
+        {"q":{"ru":"КББ PREMIUM за 1 цикл?","tk":"PREMIUM KBB 1 sikl?","uz":"PREMIUM KBB 1 sikl?"},
          "o":{"ru":["А) 8 UE","Б) 10 UE","В) 14 UE"],"tk":["A) 8 UE","B) 10 UE","C) 14 UE"],"uz":["A) 8 UE","B) 10 UE","V) 14 UE"]},
-         "a":2,"e":{"ru":"PREMIUM = 35% = 14 UE за цикл.","tk":"PREMIUM = 14 UE sikl üçin.","uz":"PREMIUM = 14 UE sikl uchun."}},
-        {"q":{"ru":"БЗК с квалификацией Сапфир?","tk":"Sapfir derejeli BZK?","uz":"Zangori malakali BZK?"},
+         "a":2,"e":{"ru":"PREMIUM = 35% = 14 UE/цикл.","tk":"PREMIUM = 14 UE sikl üçin.","uz":"PREMIUM = 14 UE sikl uchun."}},
+        {"q":{"ru":"БЗК с квалификацией Сапфир?","tk":"Sapfir BZK?","uz":"Zangori BZK?"},
          "o":{"ru":["А) 150 UE","Б) 333 UE","В) 500 UE"],"tk":["A) 150 UE","B) 333 UE","C) 500 UE"],"uz":["A) 150 UE","B) 333 UE","V) 500 UE"]},
-         "a":2,"e":{"ru":"Сапфир и выше = 500 UE в месяц.","tk":"Sapfir we ýokary = 500 UE aýda.","uz":"Zangori va yuqori = 500 UE oyda."}},
-        {"q":{"ru":"1 UE в Туркменистане?","tk":"Türkmenistanda 1 UE?","uz":"Turkmanistonda 1 UE?"},
+         "a":2,"e":{"ru":"Сапфир и выше = 500 UE/мес.","tk":"Sapfir = 500 UE aýda.","uz":"Zangori = 500 UE oyda."}},
+        {"q":{"ru":"1 UE в Туркменистане?","tk":"TKM-da 1 UE?","uz":"TKM da 1 UE?"},
          "o":{"ru":["А) 10 манат","Б) 15 манат","В) 20 манат"],"tk":["A) 10 manat","B) 15 manat","C) 20 manat"],"uz":["A) 10 manat","B) 15 manat","V) 20 manat"]},
-         "a":1,"e":{"ru":"1 UE = 15 манат (TKM), 10 000 сум (UZB).","tk":"1 UE = 15 manat (TKM).","uz":"1 UE = 15 manat (TKM)."}},
-        {"q":{"ru":"Что такое Spillover в бинаре?","tk":"Binarda Spillover näme?","uz":"Binarda Spillover nima?"},
-         "o":{"ru":["А) Тип продукта","Б) Перелив партнёров от вышестоящих в вашу структуру","В) Ежемесячный бонус"],"tk":["A) Önüm görnüşi","B) Ýokary hyzmatdaşlardan geçirilme","C) Aýlyk bonus"],"uz":["A) Mahsulot turi","B) Yuqoridagi hamkorlardan o'tkazish","V) Oylik bonus"]},
-         "a":1,"e":{"ru":"Spillover — вышестоящие наставники могут размещать партнёров в вашу структуру.","tk":"Spillover — ýokary hyzmatdaşlar olary siziň gurluşyňyza ýerleşdirip biler.","uz":"Spillover — yuqoridagi hamkorlar odamlarni sizning tuzilmangizga joylashtirishi mumkin."}},
-        {"q":{"ru":"Бустер бонус — это дополнительные сколько % к КББ?","tk":"Buster bonus KBB-e goşmaça näçe %?","uz":"Buster bonus KBB ga qo'shimcha necha %?"},
+         "a":1,"e":{"ru":"1 UE = 15 манат (TKM), 10 000 сум (UZB).","tk":"1 UE = 15 manat.","uz":"1 UE = 15 manat."}},
+        {"q":{"ru":"Что такое Spillover?","tk":"Spillover näme?","uz":"Spillover nima?"},
+         "o":{"ru":["А) Ежемесячный бонус","Б) Перелив партнёров от вышестоящих","В) Тип квалификации"],"tk":["A) Aýlyk bonus","B) Ýokary hyzmatdaşlardan geçirilme","C) Dereje görnüşi"],"uz":["A) Oylik bonus","B) Yuqoridagi hamkorlardan o'tkazish","V) Malaka turi"]},
+         "a":1,"e":{"ru":"Spillover — вышестоящие размещают партнёров в вашу структуру.","tk":"Ýokary hyzmatdaşlar gurluşyňyza goşup biler.","uz":"Yuqoridagi hamkorlar tuzilmangizga qo'shishi mumkin."}},
+        {"q":{"ru":"Бустер бонус — +% к КББ?","tk":"Buster bonus KBB-e +%?","uz":"Buster bonus KBB ga +%?"},
          "o":{"ru":["А) 10%","Б) 20%","В) 35%"],"tk":["A) 10%","B) 20%","C) 35%"],"uz":["A) 10%","B) 20%","V) 35%"]},
-         "a":1,"e":{"ru":"Бустер бонус = +20% к КББ при первом достижении квалификации от D3 и выше.","tk":"Buster bonus = KBB-e +20%.","uz":"Buster bonus = KBB ga +20%."}},
-        {"q":{"ru":"При каком условии кэшбэк аннулируется?","tk":"Kэşbэk haçan ýok edilýär?","uz":"Keshbek qachon bekor qilinadi?"},
-         "o":{"ru":["А) Через 30 дней","Б) Через 90 дней без использования","В) Никогда"],"tk":["A) 30 günden","B) 90 günden soň ulanymasaň","C) Hiçbir wagt"],"uz":["A) 30 kundan keyin","B) 90 kun ishlatmasangiz","V) Hech qachon"]},
-         "a":1,"e":{"ru":"Кэшбэк аннулируется через 90 дней без покупок с использованием кэшбэка.","tk":"Kэşbэk 90 günden soň ulanymasaň ýok edilýär.","uz":"Keshbek 90 kun ishlatmasangiz bekor qilinadi."}},
-        {"q":{"ru":"БЗК для квалификации Гранат?","tk":"Granat derejeli BZK?","uz":"Granat malakali BZK?"},
+         "a":1,"e":{"ru":"Бустер бонус = +20% к КББ при первом достижении D3 и выше.","tk":"+20% KBB-e.","uz":"+20% KBB ga."}},
+        {"q":{"ru":"Кэшбэк аннулируется через?","tk":"Kэşbэk haçan ýok edilýär?","uz":"Keshbek qachon bekor qilinadi?"},
+         "o":{"ru":["А) 30 дней","Б) 90 дней без использования","В) Никогда"],"tk":["A) 30 gün","B) 90 günden soň ulanymasaň","C) Hiçbir wagt"],"uz":["A) 30 kun","B) 90 kun ishlatmasangiz","V) Hech qachon"]},
+         "a":1,"e":{"ru":"Кэшбэк аннулируется через 90 дней без использования.","tk":"90 günden soň.","uz":"90 kun ishlatmasangiz."}},
+        {"q":{"ru":"БЗК для Гранат?","tk":"Granat BZK?","uz":"Granat BZK?"},
          "o":{"ru":["А) 100 UE","Б) 150 UE","В) 233 UE"],"tk":["A) 100 UE","B) 150 UE","C) 233 UE"],"uz":["A) 100 UE","B) 150 UE","V) 233 UE"]},
-         "a":1,"e":{"ru":"Гранат = 150 UE в месяц.","tk":"Granat = aýda 150 UE.","uz":"Granat = oyda 150 UE."}},
-        {"q":{"ru":"Лимит КББ для статуса GOLD в неделю?","tk":"GOLD statusy üçin hepdelik KBB limiti?","uz":"GOLD statusi uchun haftalik KBB limiti?"},
+         "a":1,"e":{"ru":"Гранат = 150 UE/мес.","tk":"Granat = 150 UE.","uz":"Granat = 150 UE."}},
+        {"q":{"ru":"Лимит КББ для GOLD в неделю?","tk":"GOLD hepdelik KBB limiti?","uz":"GOLD haftalik KBB limiti?"},
          "o":{"ru":["А) 200 UE","Б) 500 UE","В) 1000 UE"],"tk":["A) 200 UE","B) 500 UE","C) 1000 UE"],"uz":["A) 200 UE","B) 500 UE","V) 1000 UE"]},
-         "a":1,"e":{"ru":"GOLD: лимит 500 UE в неделю, 2000 UE в месяц.","tk":"GOLD: hepdelik limit 500 UE.","uz":"GOLD: haftalik limit 500 UE."}},
-        {"q":{"ru":"Что означает ЛО в системе Vertera?","tk":"Vertera ulgamynda ÝO näme?","uz":"Vertera tizimida LO nima?"},
+         "a":1,"e":{"ru":"GOLD: лимит 500 UE/нед.","tk":"GOLD: 500 UE hepde.","uz":"GOLD: 500 UE hafta."}},
+        {"q":{"ru":"ЛО это?","tk":"ÝO näme?","uz":"LO nima?"},
          "o":{"ru":["А) Линейный объём","Б) Личный объём","В) Лидерский оборот"],"tk":["A) Liniýa göwrümi","B) Şahsy göwrüm","C) Lider dolanyşygy"],"uz":["A) Chiziqli hajm","B) Shaxsiy hajm","V) Lider aylanmasi"]},
-         "a":1,"e":{"ru":"ЛО = Личный объём — сумма PV ваших личных покупок за месяц.","tk":"ÝO = Şahsy göwrüm — aýdaky şahsy satyn alyşlaryňyzyň PV jemi.","uz":"LO = Shaxsiy hajm — oylik shaxsiy xaridlaringizning PV yig'indisi."}},
-        {"q":{"ru":"Бинарная активность: минимум сколько партнёров в каждой ветке?","tk":"Binar işjeňligi: her şahada iň az näçe hyzmatdaş?","uz":"Binar faolligi: har tarmoqda kamida nechta hamkor?"},
+         "a":1,"e":{"ru":"ЛО = Личный объём — PV ваших личных покупок.","tk":"ÝO = Şahsy göwrüm.","uz":"LO = Shaxsiy hajm."}},
+        {"q":{"ru":"Бинарная активность: партнёров в каждой ветке?","tk":"Binar işjeňligi: her şahada?","uz":"Binar faolligi: har tarmoqda?"},
          "o":{"ru":["А) 1","Б) 2","В) 3"],"tk":["A) 1","B) 2","C) 3"],"uz":["A) 1","B) 2","V) 3"]},
-         "a":0,"e":{"ru":"Бинарная активность: по 1 лично приглашённому партнёру в каждой ветке с ЛО 20 PV.","tk":"Binar işjeňligi: her şahada 1 hyzmatdaş, 20 PV ÝO.","uz":"Binar faolligi: har tarmoqda 1 hamkor, 20 PV LO."}},
-        {"q":{"ru":"Какой % КББ у статуса PLATINUM?","tk":"PLATINUM statusynyň KBB göterimi?","uz":"PLATINUM statusining KBB foizi?"},
+         "a":0,"e":{"ru":"Бинарная активность: по 1 партнёру в каждой ветке с ЛО 20 PV.","tk":"Her şahada 1 hyzmatdaş.","uz":"Har tarmoqda 1 hamkor."}},
+        {"q":{"ru":"КББ у PLATINUM?","tk":"PLATINUM KBB göterimi?","uz":"PLATINUM KBB foizi?"},
          "o":{"ru":["А) 20%","Б) 25%","В) 35%"],"tk":["A) 20%","B) 25%","C) 35%"],"uz":["A) 20%","B) 25%","V) 35%"]},
-         "a":1,"e":{"ru":"PLATINUM = 25% = 10 UE за цикл.","tk":"PLATINUM = 25% = sikl üçin 10 UE.","uz":"PLATINUM = 25% = sikl uchun 10 UE."}},
-        {"q":{"ru":"При каком ГОБ партнёр получает квалификацию Сапфир?","tk":"Haýsy GOB-da Sapfir derejesi berilýär?","uz":"Qaysi GOB da Zangori malakasi beriladi?"},
+         "a":1,"e":{"ru":"PLATINUM = 25% = 10 UE/цикл.","tk":"PLATINUM = 25% = 10 UE.","uz":"PLATINUM = 25% = 10 UE."}},
+        {"q":{"ru":"ГОБ для Сапфира?","tk":"Sapfir GOB-y?","uz":"Zangori GOB?"},
          "o":{"ru":["А) 2000 PV","Б) 5000 PV","В) 15000 PV"],"tk":["A) 2000 PV","B) 5000 PV","C) 15000 PV"],"uz":["A) 2000 PV","B) 5000 PV","V) 15000 PV"]},
-         "a":1,"e":{"ru":"Сапфир: ЛО 40 PV + ГОБ 5000 PV.","tk":"Sapfir: ÝO 40 PV + GOB 5000 PV.","uz":"Zangori: LO 40 PV + GOB 5000 PV."}},
-        {"q":{"ru":"Сколько UE в месяц лимит для PREMIUM?","tk":"PREMIUM üçin aýlyk UE limiti?","uz":"PREMIUM uchun oylik UE limiti?"},
+         "a":1,"e":{"ru":"Сапфир: ЛО 40 PV + ГОБ 5000 PV.","tk":"Sapfir: 40 PV + GOB 5000 PV.","uz":"Zangori: 40 PV + GOB 5000 PV."}},
+        {"q":{"ru":"Лимит PREMIUM в месяц?","tk":"PREMIUM aýlyk limiti?","uz":"PREMIUM oylik limiti?"},
          "o":{"ru":["А) 80 000 UE","Б) 200 000 UE","В) 500 000 UE"],"tk":["A) 80 000 UE","B) 200 000 UE","C) 500 000 UE"],"uz":["A) 80 000 UE","B) 200 000 UE","V) 500 000 UE"]},
-         "a":1,"e":{"ru":"PREMIUM: лимит 50 000 UE/нед, 200 000 UE/мес.","tk":"PREMIUM: limit aýda 200 000 UE.","uz":"PREMIUM: limit oyda 200 000 UE."}},
-        {"q":{"ru":"Клуб 120: сколько % покупок от новых клиентов?","tk":"Klub 120: täze müşderilerden näçe %?","uz":"Klub 120: yangi mijozlardan necha %?"},
+         "a":1,"e":{"ru":"PREMIUM: лимит 200 000 UE/мес.","tk":"PREMIUM: 200 000 UE aýda.","uz":"PREMIUM: 200 000 UE oyda."}},
+        {"q":{"ru":"Клуб 120: % новых клиентов?","tk":"Klub 120: täze müşderiler %?","uz":"Klub 120: yangi mijozlar %?"},
          "o":{"ru":["А) 10%","Б) 25%","В) 50%"],"tk":["A) 10%","B) 25%","C) 50%"],"uz":["A) 10%","B) 25%","V) 50%"]},
-         "a":1,"e":{"ru":"Клуб 120: 25% (30 PV) от объёма первой линии должны быть от новых клиентов.","tk":"Klub 120: 25% täze müşderilerden.","uz":"Klub 120: 25% yangi mijozlardan."}},
+         "a":1,"e":{"ru":"Клуб 120: 25% от объёма первой линии — новые клиенты.","tk":"25% täze müşderilerden.","uz":"25% yangi mijozlardan."}},
+        {"q":{"ru":"Что такое ГОБ?","tk":"GOB näme?","uz":"GOB nima?"},
+         "o":{"ru":["А) Групповой объём Бинара","Б) Глобальный объём бонусов","В) Годовой объём"],"tk":["A) Binar topar göwrümi","B) Global bonus göwrümi","C) Ýyllyk göwrüm"],"uz":["A) Binar guruh hajmi","B) Global bonus hajmi","V) Yillik hajm"]},
+         "a":0,"e":{"ru":"ГОБ = Групповой объём Бинара — суммарный PV бинарной структуры.","tk":"GOB = Binar topar göwrümi.","uz":"GOB = Binar guruh hajmi."}},
+        {"q":{"ru":"БЗК для Рубина?","tk":"Rubin BZK?","uz":"Rubin BZK?"},
+         "o":{"ru":["А) 150 UE","Б) 233 UE","В) 333 UE"],"tk":["A) 150 UE","B) 233 UE","C) 333 UE"],"uz":["A) 150 UE","B) 233 UE","V) 333 UE"]},
+         "a":1,"e":{"ru":"Рубин = 233 UE/мес.","tk":"Rubin = 233 UE aýda.","uz":"Rubin = 233 UE oyda."}},
+        {"q":{"ru":"Лидерская активность требует ЛО?","tk":"Lider işjeňligi ÝO?","uz":"Lider faolligi LO?"},
+         "o":{"ru":["А) 20 PV","Б) 40 PV","В) 100 PV"],"tk":["A) 20 PV","B) 40 PV","C) 100 PV"],"uz":["A) 20 PV","B) 40 PV","V) 100 PV"]},
+         "a":1,"e":{"ru":"Лидерская активность = ЛО от 40 PV/мес.","tk":"Lider işjeňligi = 40 PV.","uz":"Lider faolligi = 40 PV."}},
     ],
     "work": [
-        {"q":{"ru":"Сколько приглашений нужно в День 1?","tk":"1-nji günde näçe çakylyk?","uz":"1-kunda nechta taklif?"},
+        {"q":{"ru":"Сколько приглашений в День 1?","tk":"1-nji günde çakylyk?","uz":"1-kunda taklif?"},
          "o":{"ru":["А) 1","Б) 3","В) 10"],"tk":["A) 1","B) 3","C) 10"],"uz":["A) 1","B) 3","V) 10"]},
-         "a":1,"e":{"ru":"День 1: отправить минимум 3 приглашения.","tk":"1-nji gün: azyndan 3 çakylyk.","uz":"1-kun: kamida 3 ta taklif."}},
-        {"q":{"ru":"Что означает правило 72 часов?","tk":"72 sagat düzgüni näme?","uz":"72 soat qoidasi nima?"},
-         "o":{"ru":["А) Отдыхать 72 часа","Б) Действовать в первые 72 часа","В) Звонить каждые 72 часа"],"tk":["A) 72 sagat dynç al","B) Ilkinji 72 sagatda hereket et","C) 72 sagatdan bir jaň et"],"uz":["A) 72 soat dam ol","B) Birinchi 72 soatda harakat qil","V) Har 72 soatda qo'ngiroq qil"]},
-         "a":1,"e":{"ru":"72 часа: если не действуешь — человек 'остывает'.","tk":"72 sagat: hereket etmeseň adam 'sowuýar'.","uz":"72 soat: harakat qilmasang odam 'soviydi'."}},
-        {"q":{"ru":"Формула конверсии в работе с новичками?","tk":"Konwersiýa formulasy?","uz":"Konversiya formulasi?"},
-         "o":{"ru":["А) 5 сообщений = 1 встреча","Б) 10 сообщений = 3 ответа = 1 встреча","В) 20 сообщений = 1 партнёр"],"tk":["A) 5 habar = 1 duşuşyk","B) 10 habar = 3 jogap = 1 duşuşyk","C) 20 habar = 1 hyzmatdaş"],"uz":["A) 5 xabar = 1 uchrashuv","B) 10 xabar = 3 javob = 1 uchrashuv","V) 20 xabar = 1 hamkor"]},
+         "a":1,"e":{"ru":"День 1: минимум 3 приглашения.","tk":"3 çakylyk.","uz":"3 ta taklif."}},
+        {"q":{"ru":"Правило 72 часов?","tk":"72 sagat düzgüni?","uz":"72 soat qoidasi?"},
+         "o":{"ru":["А) Отдыхать 72 часа","Б) Действовать в первые 72 часа","В) Звонить каждые 72 часа"],"tk":["A) Dynç al","B) Ilkinji 72 sagatda hereket et","C) Jaň et"],"uz":["A) Dam ol","B) Birinchi 72 soatda harakat qil","V) Qo'ngiroq qil"]},
+         "a":1,"e":{"ru":"Если не действуешь 3 дня — человек остывает.","tk":"Hereket etmeseň sowuýar.","uz":"Harakat qilmasang soviydi."}},
+        {"q":{"ru":"Формула конверсии?","tk":"Konwersiýa formulasy?","uz":"Konversiya formulasi?"},
+         "o":{"ru":["А) 5 сообщений = 1 встреча","Б) 10 сообщений = 3 ответа = 1 встреча","В) 20 сообщений = 1 партнёр"],"tk":["A) 5 habar","B) 10 habar = 3 jogap = 1 duşuşyk","C) 20 habar"],"uz":["A) 5 xabar","B) 10 xabar = 3 javob = 1 uchrashuv","V) 20 xabar"]},
          "a":1,"e":{"ru":"10 сообщений = 3 ответа = 1 встреча.","tk":"10 habar = 3 jogap = 1 duşuşyk.","uz":"10 xabar = 3 javob = 1 uchrashuv."}},
-        {"q":{"ru":"Что делать на первой встрече?","tk":"Ilkinji duşuşykda näme?","uz":"Birinchi uchrashuvda nima?"},
-         "o":{"ru":["А) Всё подробно объяснить","Б) Не обучать — показывать результаты","В) Рассказать о всех продуктах"],"tk":["A) Jikme-jik düşündirmek","B) Öwretme — netijeleri görkez","C) Ähli önümler hakda"],"uz":["A) Hamma narsani tushuntirish","B) O'rgatma — natijalarni ko'rsat","V) Barcha mahsulotlar haqida"]},
-         "a":1,"e":{"ru":"Правило: не обучай — показывай результаты, систему, продукт.","tk":"Düzgün: öwretme — görkez.","uz":"Qoida: o'rgatma — ko'rsat."}},
-        {"q":{"ru":"В какой день фиксируем первый результат?","tk":"Ilkinji netijäni haýsy günde?","uz":"Birinchi natijani qaysi kunda?"},
+        {"q":{"ru":"Первая встреча — что делать?","tk":"Ilkinji duşuşyk — näme?","uz":"Birinchi uchrashuv — nima?"},
+         "o":{"ru":["А) Всё объяснить","Б) Не обучать — показывать результаты","В) Дать материалы"],"tk":["A) Düşündirmek","B) Öwretme — netijeleri görkez","C) Materiallary ber"],"uz":["A) Tushuntirish","B) O'rgatma — natijalarni ko'rsat","V) Materiallarni ber"]},
+         "a":1,"e":{"ru":"Не обучай — показывай. Результаты, система, продукт.","tk":"Öwretme — görkez.","uz":"O'rgatma — ko'rsat."}},
+        {"q":{"ru":"Когда фиксируем первый результат?","tk":"Ilkinji netije haýsy günde?","uz":"Birinchi natija qaysi kunda?"},
          "o":{"ru":["А) День 3","Б) День 5","В) День 7"],"tk":["A) 3-nji gün","B) 5-nji gün","C) 7-nji gün"],"uz":["A) 3-kun","B) 5-kun","V) 7-kun"]},
-         "a":1,"e":{"ru":"День 5 — создать веру через первый результат.","tk":"5-nji gün — ilkinji netije.","uz":"5-kun — birinchi natija."}},
+         "a":1,"e":{"ru":"День 5 — зафиксировать первый результат.","tk":"5-nji gün.","uz":"5-kun."}},
+        {"q":{"ru":"Сколько контактов в День 1?","tk":"1-nji günde kontakt?","uz":"1-kunda kontakt?"},
+         "o":{"ru":["А) 10","Б) 30","В) 50"],"tk":["A) 10","B) 30","C) 50"],"uz":["A) 10","B) 30","V) 50"]},
+         "a":1,"e":{"ru":"День 1: список минимум 30 контактов.","tk":"30 kontakt sanawy.","uz":"30 ta kontakt ro'yxati."}},
+        {"q":{"ru":"Цель ежедневного контроля?","tk":"Her günki gözegçiligiň maksady?","uz":"Kunlik nazorat maqsadi?"},
+         "o":{"ru":["А) Считать деньги","Б) Ежедневная связь с наставником","В) Проверять продажи"],"tk":["A) Pul san","B) Nastawnik bilen aragatnaşyk","C) Satyşlary barla"],"uz":["A) Pul hisoblash","B) Murabbiy bilan aloqa","V) Sotuvlarni tekshirish"]},
+         "a":1,"e":{"ru":"Ежедневный контроль = ежедневная связь с наставником для поддержки.","tk":"Her günki nastawnik aragatnaşygy.","uz":"Kunlik murabbiy aloqasi."}},
     ],
 }
 
@@ -1686,64 +1739,93 @@ QUIZ_DATA = {
 # ══════════════════════════════════════════════════════════════
 ACADEMY_CONTENT = {
     "ru": (
-        "🎓 *Академия гомеостаза Vertera*\n\n"
-        "Академия гомеостаза — это образовательная платформа компании Vertera, "
-        "созданная для глубокого изучения принципов здоровья и баланса организма.\n\n"
-        "📚 *Что такое гомеостаз?*\n"
-        "Гомеостаз — это способность организма поддерживать стабильное внутреннее состояние "
-        "несмотря на внешние изменения. Это баланс всех систем: иммунной, пищеварительной, "
-        "сердечно-сосудистой и других.\n\n"
-        "🌊 *Роль водорослей в гомеостазе:*\n"
-        "• Ламинария и фукус содержат более 140 биоактивных веществ\n"
-        "• Йод, магний, кальций, витамины поддерживают баланс систем\n"
-        "• Полисахариды водорослей стимулируют иммунитет\n"
-        "• Антиоксиданты защищают клетки от повреждений\n\n"
-        "🔬 *Технология PLASMA:*\n"
-        "Уникальная технология Vertera преобразует активные вещества водорослей "
-        "в наночастицы, которые проникают в клетки напрямую. "
-        "Биодоступность в 3-5 раз выше обычных продуктов.\n\n"
-        "📖 *Программы академии:*\n"
-        "• Основы нутрициологии и здорового питания\n"
-        "• Детокс и очищение организма\n"
-        "• Укрепление иммунитета\n"
-        "• Здоровье сердечно-сосудистой системы\n"
-        "• Детское питание и развитие\n\n"
-        "🌿 Академия гомеостаза Vertera — это ваш путь к глубокому пониманию "
-        "здоровья и возможность стать экспертом в области натурального питания!"
+        "🎓 *Образовательная платформа VERTERA*\n\n"
+        "Это не просто обучение — это система, которая объединяет:\n"
+        "науку · медицину · нутрициологию · бизнес\n\n"
+        "👉 Ключевая цель — научить человека управлять своим здоровьем и доходом.\n\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "📘 *Курс: Консультант по ЗОЖ*\n"
+        "256 учебных часов · Диплом о профессиональной переподготовке\n"
+        "• Гомеостаз и баланс организма\n"
+        "• Психо-нейро-иммунная система · Стресс и восстановление\n"
+        "• Питание и детокс · Здоровье опорно-двигательной системы\n"
+        "💰 TKM: 30 000 манат | UZB: 18 750 000 сум\n\n"
+        "🌿 *Курс: Талассонутрициология*\n"
+        "256 часов · Диплом с присвоением квалификации\n"
+        "• Влияние водорослей на организм\n"
+        "• Биологически активные вещества · Восстановление систем\n"
+        "💰 TKM: 14 000 манат | UZB: 8 750 000 сум\n\n"
+        "💆 *Курс: Талассокосметология*\n"
+        "256 часов · Диплом «Косметик-эстетист»\n"
+        "• Уход за кожей и телом · Омоложение и восстановление\n"
+        "• Работа с водорослями · Эстетическая медицина\n"
+        "💰 TKM: 14 000 манат | UZB: 8 750 000 сум\n\n"
+        "👶 *Курс: Детская нутрициология*\n"
+        "20 часов · Свидетельство\n"
+        "• Здоровье детей · Питание · Профилактика\n"
+        "💰 TKM: 6 000 манат | UZB: 3 750 000 сум\n\n"
+        "🔥 *Пакет 3 в 1* — 3 курса · 768 часов · 3 диплома\n"
+        "💰 TKM: 45 000 манат | UZB: 28 000 000 сум\n\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "🏛 *Партнёры академии:*\n"
+        "• Первый медицинский университет им. Сеченова\n"
+        "• Институт междисциплинарной медицины\n"
+        "• НИИ детского питания\n"
+        "• Федеральный центр обучения специалистов эстетической медицины\n\n"
+        "👉 Обучение основано на научной базе и практике — не на мнениях!\n\n"
+        "🌿 *Присоединяйтесь к академии Vertera!*"
     ),
     "tk": (
-        "🎓 *Vertera Gomeostaz akademiýasy*\n\n"
-        "Gomeostaz akademiýasy — bedeniň saglygyny we deňagramlylygyny çuňňur öwrenmek üçin "
-        "Vertera kompaniýasynyň döredilen bilim platformasy.\n\n"
-        "📚 *Gomeostaz näme?*\n"
-        "Gomeostaz — bedeniň daşarky üýtgeşmelere garamazdan durnukly içki ýagdaýyny saklamak "
-        "ukyby. Bu ähli ulgamlaryň deňagramlylygy: immunitet, siňdiriş, ýürek-damar we beýlekiler.\n\n"
-        "🌊 *Suw ösümlikleriniň gomeostazda roly:*\n"
-        "• Laminariýa we fukus 140+ bioaktiw madda öz içine alýar\n"
-        "• Ýod, magniý, kalsiý, witaminler ulgam deňagramlylygyny saklaýar\n"
-        "• Suw ösümlikleriniň polisakaridleri immuniteti güýçlendirýär\n"
-        "• Antioksidantlar öýjükleri goraýar\n\n"
-        "🔬 *PLASMA tehnologiýasy:*\n"
-        "Vertera-nyň özboluşly tehnologiýasy suw ösümlikleriniň işjeň maddalaryny "
-        "nanozarryjalara öwürýär. Biodostuplugy adaty önümlerden 3-5 esse ýokary.\n\n"
-        "🌿 Vertera Gomeostaz akademiýasy — saglygy çuňňur düşünmek ýoluňyz!"
+        "🎓 *VERTERA Bilim platformasy*\n\n"
+        "Bu diňe okuw däl — ylmy, lukmançylygy, iýmit ylmyny we işi birleşdirýän ulgam.\n\n"
+        "👉 Esasy maksat — saglygyňyzy we girdejüňizi dolandyrmagy öwretmek.\n\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "📘 *Kurs: Saglyk maslahatçysy*\n"
+        "256 sagat · Hünärmenlik diplomu\n"
+        "• Gomeostaz we bedenin deňagramlylygy\n"
+        "• Iýmit we detoks · Daýanç-hereket ulgamy\n"
+        "💰 TKM: 30 000 manat | UZB: 18 750 000 sum\n\n"
+        "🌿 *Kurs: Talassonutrisiologiýa*\n"
+        "256 sagat · Hünär diplomu\n"
+        "• Suw ösümlikleriniň bedene täsiri\n"
+        "• Biologiki işjeň maddalar\n"
+        "💰 TKM: 14 000 manat | UZB: 8 750 000 sum\n\n"
+        "💆 *Kurs: Talassokosmetologiýa*\n"
+        "256 sagat · Diplom\n"
+        "• Deri we beden idegi · Ýaşartmak\n"
+        "💰 TKM: 14 000 manat | UZB: 8 750 000 sum\n\n"
+        "👶 *Kurs: Çaga iýmit ylmy*\n"
+        "20 sagat · Şahadatnama\n"
+        "💰 TKM: 6 000 manat | UZB: 3 750 000 sum\n\n"
+        "🔥 *3 in 1 paket* — 3 kurs · 768 sagat · 3 diplom\n"
+        "💰 TKM: 45 000 manat | UZB: 28 000 000 sum\n\n"
+        "🌿 *Vertera akademiýasyna goşulyň!*"
     ),
     "uz": (
-        "🎓 *Vertera Gomeostaz akademiyasi*\n\n"
-        "Gomeostaz akademiyasi — organizm salomatligi va muvozanatini chuqur o'rganish uchun "
-        "Vertera kompaniyasining ta'lim platformasi.\n\n"
-        "📚 *Gomeostaz nima?*\n"
-        "Gomeostaz — organizmning tashqi o'zgarishlarga qaramasdan barqaror ichki holatini "
-        "saqlash qobiliyati. Bu barcha tizimlarning balansi: immunitet, hazm, yurak-tomir va boshqalar.\n\n"
-        "🌊 *Suv o'tlarining gomeostazda roli:*\n"
-        "• Laminaria va fukus 140+ bioaktiv modda o'z ichiga oladi\n"
-        "• Yod, magniy, kaltsiy, vitaminlar tizim balansini saqlaydi\n"
-        "• Suv o'tlarining polisakaridlari immunitetni kuchaytiradi\n"
-        "• Antioksidantlar hujayralarni himoya qiladi\n\n"
-        "🔬 *PLASMA texnologiyasi:*\n"
-        "Vertera ning noyob texnologiyasi suv o'tlarining faol moddalarini nanozarrachalar "
-        "ga aylantiradi. Biodostuplik oddiy mahsulotlardan 3-5 marta yuqori.\n\n"
-        "🌿 Vertera Gomeostaz akademiyasi — sog'likni chuqur tushunish yo'lingiz!"
+        "🎓 *VERTERA Ta'lim platformasi*\n\n"
+        "Bu shunchaki o'qitish emas — ilm, tibbiyot, nutrisiologiya va biznesni birlashtirgan tizim.\n\n"
+        "👉 Asosiy maqsad — sog'ligingizni va daromadingizni boshqarishni o'rgatish.\n\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "📘 *Kurs: Sog'lom turmush tarzi maslahatchisi*\n"
+        "256 soat · Kasbiy qayta tayyorlash diplomи\n"
+        "• Gomeostaz va organizm balansi\n"
+        "• Oziqlanish va detoks · Tayanch-harakat tizimi\n"
+        "💰 TKM: 30 000 manat | UZB: 18 750 000 so'm\n\n"
+        "🌿 *Kurs: Talassonutrisiologiya*\n"
+        "256 soat · Diplom\n"
+        "• Suv o'tlarining organizmga ta'siri\n"
+        "• Biologik faol moddalar\n"
+        "💰 TKM: 14 000 manat | UZB: 8 750 000 so'm\n\n"
+        "💆 *Kurs: Talassokosmetologiya*\n"
+        "256 soat · Diplom «Kosmetist-estetist»\n"
+        "• Teri va tana parvarishi · Yoshartish\n"
+        "💰 TKM: 14 000 manat | UZB: 8 750 000 so'm\n\n"
+        "👶 *Kurs: Bolalar nutrisiologiyasi*\n"
+        "20 soat · Guvohnoma\n"
+        "💰 TKM: 6 000 manat | UZB: 3 750 000 so'm\n\n"
+        "🔥 *3 ta 1 da paket* — 3 kurs · 768 soat · 3 diplom\n"
+        "💰 TKM: 45 000 manat | UZB: 28 000 000 so'm\n\n"
+        "🌿 *Vertera akademiyasiga qo'shiling!*"
     ),
 }
 
