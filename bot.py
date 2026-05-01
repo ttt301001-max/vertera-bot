@@ -204,11 +204,32 @@ async def quiz_load():
         logger.error(f"quiz_load: {e}")
 
 
-# ─── Хранилище видео ─────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════
+# ─── СИСТЕМА ВИДЕО (постоянное хранение + несколько видео) ────
+# ═══════════════════════════════════════════════════════════════
+#
+# Структура хранения в _VIDEOS_F (и Google Sheets):
+#
+# {
+#   "slot_lang": [
+#     {"file_id": "...", "type": "video|video_note|animation",
+#      "order": 1, "delay": 0},   # delay — пауза перед этим видео (сек)
+#     ...
+#   ],
+#   ...
+# }
+#
+# Триггерные видео (отправляются по таймеру, не привязаны к действию):
+# {
+#   "trigger_start_1h":  [{"file_id":..., "type":..., "order":1, "delay":0}],
+#   "trigger_idle_30m":  [...],
+#   ...
+# }
+# Триггеры: trigger_start_Xm (через X минут после /start)
+#            trigger_idle_Xm  (через X минут неактивности)
+# ═══════════════════════════════════════════════════════════════
 
-# Слоты с поддержкой языков: ключ -> (базовое имя, поддерживает языки?)
-# Для языкозависимых слотов хранятся ключи: slot_ru / slot_tk / slot_uz
-# Для языконезависимых — просто slot
+import asyncio, time as _time
 
 LANG_LABELS = {"ru": "🇷🇺 РУ", "tk": "🇹🇲 ТМ", "uz": "🇺🇿 УЗ"}
 
@@ -235,66 +256,230 @@ VIDEO_SLOTS_BASE = {
     "mkt_day_6":    ("📊 Маркетинг — День 6",                 True),
     "mkt_day_7":    ("📊 Маркетинг — День 7",                 True),
 }
-
-# Плоский словарь для обратной совместимости
 VIDEO_SLOTS = {k: v[0] for k, v in VIDEO_SLOTS_BASE.items()}
 
-def _video_key(slot: str, lang: str = None) -> str:
-    """Возвращает ключ для хранения видео. Если слот поддерживает языки и lang задан — slot_lang."""
+# ─── Ключ хранения ────────────────────────────────────────────
+def _vkey(slot: str, lang: str = None) -> str:
     info = VIDEO_SLOTS_BASE.get(slot)
     if info and info[1] and lang:
         return f"{slot}_{lang}"
     return slot
 
-def video_get(slot: str, lang: str = None) -> dict:
-    """Возвращает {'file_id': ..., 'type': ...} для слота (с учётом языка, или fallback на общий)."""
+# ─── CRUD: список видео для ключа ─────────────────────────────
+def vlist_get(key: str) -> list:
+    """Список видео для ключа (может быть пустым)."""
     d = _jload(_VIDEOS_F)
-    if lang:
-        key = _video_key(slot, lang)
-        if key in d:
-            return d[key]
-        # Fallback: попробуем без языка
-        if slot in d:
-            return d[slot]
-        return {}
-    return d.get(slot, {})
+    v = d.get(key, [])
+    # Обратная совместимость: если старый формат dict -> конвертируем
+    if isinstance(v, dict):
+        return [{"file_id": v["file_id"], "type": v.get("type","video"), "order":1, "delay":0}]
+    return v if isinstance(v, list) else []
 
-def video_set(slot: str, file_id: str, vtype: str, lang: str = None):
+def vlist_set(key: str, lst: list):
     d = _jload(_VIDEOS_F)
-    key = _video_key(slot, lang)
-    d[key] = {"file_id": file_id, "type": vtype}
+    d[key] = lst
     _jsave(_VIDEOS_F, d)
 
-def video_delete(slot: str, lang: str = None):
-    d = _jload(_VIDEOS_F)
-    key = _video_key(slot, lang)
-    d.pop(key, None)
-    _jsave(_VIDEOS_F, d)
+def vlist_add(key: str, file_id: str, vtype: str, order: int = None, delay: int = 0):
+    lst = vlist_get(key)
+    if order is None:
+        order = len(lst) + 1
+    lst.append({"file_id": file_id, "type": vtype, "order": order, "delay": delay})
+    lst.sort(key=lambda x: x.get("order", 999))
+    vlist_set(key, lst)
+
+def vlist_delete_idx(key: str, idx: int):
+    lst = vlist_get(key)
+    if 0 <= idx < len(lst):
+        lst.pop(idx)
+        for i, item in enumerate(lst):
+            item["order"] = i + 1
+        vlist_set(key, lst)
+
+def vlist_move(key: str, idx: int, direction: int):
+    """Перемещает видео на позицию вверх (-1) или вниз (+1)."""
+    lst = vlist_get(key)
+    new_idx = idx + direction
+    if 0 <= new_idx < len(lst):
+        lst[idx], lst[new_idx] = lst[new_idx], lst[idx]
+        for i, item in enumerate(lst):
+            item["order"] = i + 1
+        vlist_set(key, lst)
 
 def video_has_any(slot: str) -> bool:
-    """Проверяет, есть ли хоть одно видео для слота (любой язык)."""
     d = _jload(_VIDEOS_F)
-    if slot in d:
+    if slot in d and d[slot]:
         return True
     for lang in ("ru", "tk", "uz"):
-        if f"{slot}_{lang}" in d:
+        k = f"{slot}_{lang}"
+        if k in d and d[k]:
             return True
     return False
 
-async def send_slot_video(bot, chat_id: int, slot: str, lang: str = None):
-    """Отправляет видео для слота если оно есть. Учитывает язык пользователя."""
-    v = video_get(slot, lang)
-    if not v or not v.get("file_id"):
+def vlist_count(key: str) -> int:
+    return len(vlist_get(key))
+
+# ─── Отправка видео (одного) ──────────────────────────────────
+async def _send_one_video(bot, chat_id: int, v: dict):
+    fid   = v.get("file_id")
+    vtype = v.get("type", "video")
+    if not fid:
         return
+    if vtype == "video_note":
+        await bot.send_video_note(chat_id=chat_id, video_note=fid)
+    elif vtype == "animation":
+        await bot.send_animation(chat_id=chat_id, animation=fid)
+    else:
+        await bot.send_video(chat_id=chat_id, video=fid)
+
+# ─── Отправка всей очереди видео для слота ───────────────────
+async def send_slot_video(bot, chat_id: int, slot: str, lang: str = None):
+    """Отправляет все видео слота по очереди с паузами."""
+    key = _vkey(slot, lang)
+    lst = vlist_get(key)
+    # Fallback: без языка
+    if not lst and lang:
+        lst = vlist_get(slot)
+    if not lst:
+        return
+    for v in lst:
+        delay = int(v.get("delay", 0))
+        if delay > 0:
+            await asyncio.sleep(delay)
+        try:
+            await _send_one_video(bot, chat_id, v)
+        except Exception as e:
+            logger.error(f"send_slot_video {slot} #{v.get('order')}: {e}")
+
+# ─── ТРИГГЕРНЫЕ ВИДЕО ─────────────────────────────────────────
+# Триггеры хранятся в _VIDEOS_F под ключами вида:
+#   trigger_start_{lang}_{minutes}  — через N минут после /start
+#   trigger_idle_{lang}_{minutes}   — через N минут неактивности
+#
+# Таймеры хранятся в user_data под ключами:
+#   trigger_start_task, trigger_idle_task
+
+_TRIGGER_START_PREFIX = "trigger_start"
+_TRIGGER_IDLE_PREFIX  = "trigger_idle"
+
+def get_all_triggers() -> list:
+    """Возвращает список всех настроенных триггеров: [{"key":..., "lang":..., "minutes":..., "kind":...}, ...]"""
+    d = _jload(_VIDEOS_F)
+    result = []
+    for key, val in d.items():
+        if not (isinstance(val, list) and val):
+            continue
+        if key.startswith(_TRIGGER_START_PREFIX + "_"):
+            rest = key[len(_TRIGGER_START_PREFIX)+1:]   # lang_minutes
+            parts = rest.split("_")
+            if len(parts) == 2:
+                result.append({"key": key, "kind": "start", "lang": parts[0], "minutes": int(parts[1])})
+        elif key.startswith(_TRIGGER_IDLE_PREFIX + "_"):
+            rest = key[len(_TRIGGER_IDLE_PREFIX)+1:]
+            parts = rest.split("_")
+            if len(parts) == 2:
+                result.append({"key": key, "kind": "idle", "lang": parts[0], "minutes": int(parts[1])})
+    return result
+
+def trigger_key(kind: str, lang: str, minutes: int) -> str:
+    prefix = _TRIGGER_START_PREFIX if kind == "start" else _TRIGGER_IDLE_PREFIX
+    return f"{prefix}_{lang}_{minutes}"
+
+async def _run_trigger_job(bot, chat_id: int, key: str, seconds: int):
+    """Засыпает seconds секунд, потом отправляет видео из триггера."""
+    await asyncio.sleep(seconds)
+    lst = vlist_get(key)
+    for v in lst:
+        delay = int(v.get("delay", 0))
+        if delay > 0:
+            await asyncio.sleep(delay)
+        try:
+            await _send_one_video(bot, chat_id, v)
+        except Exception as e:
+            logger.error(f"trigger {key}: {e}")
+
+def schedule_triggers(context, uid: int, lang: str, kind: str):
+    """Запускает все триггеры нужного вида для данного пользователя."""
+    d = _jload(_VIDEOS_F)
+    prefix = _TRIGGER_START_PREFIX if kind == "start" else _TRIGGER_IDLE_PREFIX
+    for key, val in d.items():
+        if not (isinstance(val, list) and val):
+            continue
+        if not key.startswith(prefix + "_"):
+            continue
+        rest = key[len(prefix)+1:]
+        parts = rest.split("_")
+        if len(parts) != 2:
+            continue
+        klang, kmin = parts[0], parts[1]
+        if klang != lang:
+            continue
+        seconds = int(kmin) * 60
+        task_key = f"trig_{kind}_{lang}_{kmin}"
+        # Отменяем предыдущий если был
+        old = context.user_data.pop(task_key, None)
+        if old:
+            try: old.cancel()
+            except Exception: pass
+        task = asyncio.ensure_future(
+            _run_trigger_job(context.bot, uid, key, seconds)
+        )
+        context.user_data[task_key] = task
+        logger.info(f"⏱ Trigger {key} scheduled for uid={uid} in {seconds}s")
+
+def cancel_idle_triggers(context, lang: str):
+    """Отменяет idle-триггеры (при активности пользователя)."""
+    d = _jload(_VIDEOS_F)
+    prefix = _TRIGGER_IDLE_PREFIX
+    for key in d:
+        if not key.startswith(prefix + "_"):
+            continue
+        rest = key[len(prefix)+1:]
+        parts = rest.split("_")
+        if len(parts) != 2: continue
+        klang, kmin = parts[0], parts[1]
+        if klang != lang: continue
+        task_key = f"trig_idle_{lang}_{kmin}"
+        old = context.user_data.pop(task_key, None)
+        if old:
+            try: old.cancel()
+            except Exception: pass
+
+def reschedule_idle_triggers(context, uid: int, lang: str):
+    """Перезапускает idle-триггеры (при каждом сообщении пользователя)."""
+    cancel_idle_triggers(context, lang)
+    schedule_triggers(context, uid, lang, "idle")
+
+# ─── Сохранение/загрузка видео в Google Sheets ────────────────
+async def videos_save_to_sheets():
+    """Сохраняет всю базу видео в Google Sheets (ключ-значение)."""
     try:
-        if v["type"] == "video_note":
-            await bot.send_video_note(chat_id=chat_id, video_note=v["file_id"])
-        elif v["type"] == "animation":
-            await bot.send_animation(chat_id=chat_id, animation=v["file_id"])
-        else:
-            await bot.send_video(chat_id=chat_id, video=v["file_id"])
+        d = _jload(_VIDEOS_F)
+        import json as _json
+        async with httpx.AsyncClient(follow_redirects=True) as c:
+            await c.post(GOOGLE_SHEET_URL, json={
+                "type":   "save_videos",
+                "videos": _json.dumps(d, ensure_ascii=False),
+            }, timeout=30)
+        logger.info("✅ Видео сохранены в Google Sheets")
     except Exception as e:
-        logger.error(f"send_slot_video {slot} (lang={lang}): {e}")
+        logger.error(f"videos_save_to_sheets: {e}")
+
+async def videos_load_from_sheets():
+    """Загружает всю базу видео из Google Sheets при старте."""
+    try:
+        import json as _json
+        async with httpx.AsyncClient(follow_redirects=True) as c:
+            resp = await c.post(GOOGLE_SHEET_URL, json={"type": "get_videos"}, timeout=15)
+            data = resp.json()
+        if data.get("status") == "ok" and data.get("videos"):
+            d = _json.loads(data["videos"])
+            _jsave(_VIDEOS_F, d)
+            logger.info(f"✅ Видео загружены из Sheets: {len(d)} ключей")
+        else:
+            logger.info(f"get_videos ответ: {data}")
+    except Exception as e:
+        logger.error(f"videos_load_from_sheets: {e}")
 
 async def progress_sync_to_sheets(uid: int, day: int, name: str, uname: str):
     """Сохраняет прогресс в Google Sheets."""
@@ -969,6 +1154,7 @@ async def _load_partners_impl(app=None):
     await mkt_progress_load()
     await quiz_load()
     await users_load_from_sheets()
+    await videos_load_from_sheets()   # ← Загружаем видео из Sheets при каждом старте
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
@@ -1031,6 +1217,10 @@ async def select_lang(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown",
         reply_markup=get_main_keyboard(lang)
     )
+    # Запускаем триггеры «после старта»
+    schedule_triggers(context, user.id, lang, "start")
+    # Запускаем триггеры «при неактивности»
+    schedule_triggers(context, user.id, lang, "idle")
     return CHAT
 
 # ─── Основной чат ────────────────────────────────────────────
@@ -1041,6 +1231,9 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     country = context.user_data.get("country", "TKM")
     phone = get_phone(country)
     t = TEXTS[lang]
+
+    # Перезапускаем idle-триггеры при любой активности
+    reschedule_idle_triggers(context, user.id, lang)
 
     # Кнопка "Я партнёр"
     partner_btn_texts = [PT[l]["btn"] for l in PT]
@@ -2980,6 +3173,40 @@ async def admin_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return ADMIN_MENU
 
+async def _show_slot_detail(update, key: str, slot: str, lang: str):
+    """Показывает список видео для слота+языка с кнопками управления."""
+    lst = vlist_get(key)
+    lbl = LANG_LABELS.get(lang, lang)
+    lines = []
+    for i, v in enumerate(lst):
+        n = i + 1
+        delay = v.get("delay", 0)
+        delay_str = f" (пауза {delay}с)" if delay else ""
+        lines.append(f"*{n}.* {v.get('type','video')}{delay_str}")
+    list_text = "\n".join(lines) if lines else "Видео нет — добавьте первое!"
+
+    # Кнопки управления
+    rows = [["➕ Добавить видео"]]
+    for i, v in enumerate(lst):
+        n = i + 1
+        btns = []
+        if i > 0:           btns.append(f"⬆ #{n}")
+        if i < len(lst)-1:  btns.append(f"⬇ #{n}")
+        btns.append(f"🗑 Удалить #{n}")
+        rows.append(btns)
+    if lst:
+        rows.append(["🗑 Очистить всё"])
+    rows.append(["🔙 Назад к языкам"])
+
+    await update.message.reply_text(
+        f"📍 *{VIDEO_SLOTS[slot]}* — {lbl}\n\n"
+        f"Очередь видео ({len(lst)} шт.):\n{list_text}\n\n"
+        f"Видео отправляются по порядку с заданными паузами.\n"
+        f"Добавьте ещё или отправьте видео прямо сейчас:",
+        parse_mode="Markdown",
+        reply_markup=ReplyKeyboardMarkup(rows, resize_keyboard=True)
+    )
+
 async def admin_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обрабатывает кнопки admin-меню (только для менеджера)."""
     if update.effective_user.id != MANAGER_CHAT_ID:
@@ -3039,144 +3266,397 @@ async def admin_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=ADMIN_KB)
         return ADMIN_MENU
 
-    # ── Управление видео ─────────────────────────────────────
+    # ══════════════════════════════════════════════════════
+    # ── УПРАВЛЕНИЕ ВИДЕО (полная система) ─────────────────
+    # ══════════════════════════════════════════════════════
     if text == "🎬 Управление видео":
-        context.user_data["admin_video_menu"] = True
-        context.user_data.pop("admin_video_slot", None)
-        context.user_data.pop("admin_video_lang", None)
-        # Показываем список слотов с иконкой наличия видео
-        rows = []
-        for slot, (label, _) in VIDEO_SLOTS_BASE.items():
-            has = "✅" if video_has_any(slot) else "⬜"
-            rows.append([f"{has} {label}"])
-        rows.append(["🔙 Назад в меню"])
-        kb = ReplyKeyboardMarkup(rows, resize_keyboard=True)
+        context.user_data["avm"] = {"step": "main"}
+        kb = ReplyKeyboardMarkup([
+            ["📌 Видео для слотов", "⏱ Триггерные видео"],
+            ["🔙 Назад в меню"]
+        ], resize_keyboard=True)
         await update.message.reply_text(
             "🎬 *Управление видео*\n\n"
-            "✅ — видео загружено\n⬜ — видео отсутствует\n\n"
-            "Выберите слот для загрузки или замены видео:",
+            "📌 *Слоты* — видео привязаны к действиям (приветствие, обучение, маркетинг...)\n"
+            "⏱ *Триггеры* — видео по таймеру (через час, через день, при неактивности)\n\n"
+            "Все видео *сохраняются в Google Sheets* и не теряются при обновлении бота.",
             parse_mode="Markdown", reply_markup=kb
         )
         return ADMIN_MENU
 
-    # Обработка выбора слота видео — сначала выбираем слот, потом язык
-    if context.user_data.get("admin_video_menu") and not context.user_data.get("admin_video_slot"):
+    # ── Главное меню управления видео ─────────────────────
+    avm = context.user_data.get("avm", {})
+    if not avm:
+        pass  # не в режиме видео — идём дальше
+
+    elif avm.get("step") == "main":
         if text == "🔙 Назад в меню":
-            context.user_data.pop("admin_video_menu", None)
+            context.user_data.pop("avm", None)
             await update.message.reply_text("Вернулись в меню.", reply_markup=ADMIN_KB)
             return ADMIN_MENU
-        # Ищем выбранный слот
+
+        elif text == "📌 Видео для слотов":
+            context.user_data["avm"] = {"step": "slots"}
+            rows = []
+            for slot, (label, _) in VIDEO_SLOTS_BASE.items():
+                has = "✅" if video_has_any(slot) else "⬜"
+                rows.append([f"{has} {label}"])
+            rows.append(["🔙 Назад"])
+            await update.message.reply_text(
+                "📌 *Видео для слотов*\n✅ — есть видео | ⬜ — пусто\n\nВыберите слот:",
+                parse_mode="Markdown",
+                reply_markup=ReplyKeyboardMarkup(rows, resize_keyboard=True)
+            )
+            return ADMIN_MENU
+
+        elif text == "⏱ Триггерные видео":
+            context.user_data["avm"] = {"step": "triggers_main"}
+            triggers = get_all_triggers()
+            lines = []
+            for tr in triggers:
+                kind_ru = "после старта" if tr["kind"] == "start" else "при неактивности"
+                cnt = vlist_count(tr["key"])
+                lines.append(f"• {LANG_LABELS.get(tr['lang'], tr['lang'])} — {kind_ru} — через {tr['minutes']} мин ({cnt} вид.)")
+            tlist = "\n".join(lines) if lines else "Триггеров пока нет."
+            kb = ReplyKeyboardMarkup([
+                ["➕ Добавить триггер", "🗑 Удалить триггер"],
+                ["🔙 Назад"]
+            ], resize_keyboard=True)
+            await update.message.reply_text(
+                f"⏱ *Триггерные видео*\n\n{tlist}\n\n"
+                "➕ — настроить новый триггер\n🗑 — удалить триггер",
+                parse_mode="Markdown", reply_markup=kb
+            )
+            return ADMIN_MENU
+
+    # ── Слоты: выбор слота ────────────────────────────────
+    elif avm.get("step") == "slots":
+        if text == "🔙 Назад":
+            context.user_data["avm"] = {"step": "main"}
+            kb = ReplyKeyboardMarkup([
+                ["📌 Видео для слотов", "⏱ Триггерные видео"],
+                ["🔙 Назад в меню"]
+            ], resize_keyboard=True)
+            await update.message.reply_text("Главное меню видео:", reply_markup=kb)
+            return ADMIN_MENU
+        # Ищем слот
         chosen_slot = None
         for slot, (label, _) in VIDEO_SLOTS_BASE.items():
             if label in text:
                 chosen_slot = slot
                 break
         if chosen_slot:
-            context.user_data["admin_video_slot"] = chosen_slot
-            context.user_data.pop("admin_video_lang", None)
-            # Показываем выбор языка
+            context.user_data["avm"] = {"step": "slot_lang", "slot": chosen_slot}
             d = _jload(_VIDEOS_F)
             lines = []
             for lang, lbl in LANG_LABELS.items():
                 key = f"{chosen_slot}_{lang}"
-                has = "✅" if key in d else "⬜"
-                lines.append(f"{has} {lbl}")
-            kb = ReplyKeyboardMarkup(
-                [[f"🇷🇺 Видео РУ", f"🇹🇲 Видео ТМ", f"🇺🇿 Видео УЗ"],
-                 ["🔙 Назад к списку"]],
-                resize_keyboard=True
-            )
-            status_text = "  |  ".join(lines)
+                cnt = vlist_count(key)
+                lines.append(f"{lbl}: {cnt} вид.")
+            kb = ReplyKeyboardMarkup([
+                ["🇷🇺 РУ", "🇹🇲 ТМ", "🇺🇿 УЗ"],
+                ["🔙 Назад к слотам"]
+            ], resize_keyboard=True)
             await update.message.reply_text(
-                f"📍 *{VIDEO_SLOTS[chosen_slot]}*\n\n"
-                f"Статус по языкам: {status_text}\n\n"
-                f"Выберите язык, для которого хотите загрузить видео:",
+                f"📍 *{VIDEO_SLOTS[chosen_slot]}*\n\n" + " | ".join(lines) +
+                "\n\nВыберите язык:",
                 parse_mode="Markdown", reply_markup=kb
             )
             return ADMIN_MENU
 
-    # Обработка выбора языка для слота
-    if context.user_data.get("admin_video_menu") and context.user_data.get("admin_video_slot") and not context.user_data.get("admin_video_lang"):
-        slot = context.user_data["admin_video_slot"]
-        lang_map = {"🇷🇺 Видео РУ": "ru", "🇹🇲 Видео ТМ": "tk", "🇺🇿 Видео УЗ": "uz"}
-        if text == "🔙 Назад к списку":
-            context.user_data.pop("admin_video_slot", None)
+    # ── Слоты: выбор языка ────────────────────────────────
+    elif avm.get("step") == "slot_lang":
+        slot = avm.get("slot")
+        lang_map = {"🇷🇺 РУ": "ru", "🇹🇲 ТМ": "tk", "🇺🇿 УЗ": "uz"}
+        if text == "🔙 Назад к слотам":
+            context.user_data["avm"] = {"step": "slots"}
             rows = []
             for s, (label, _) in VIDEO_SLOTS_BASE.items():
                 has = "✅" if video_has_any(s) else "⬜"
                 rows.append([f"{has} {label}"])
-            rows.append(["🔙 Назад в меню"])
-            kb = ReplyKeyboardMarkup(rows, resize_keyboard=True)
-            await update.message.reply_text("Выберите слот:", reply_markup=kb)
+            rows.append(["🔙 Назад"])
+            await update.message.reply_text("Выберите слот:",
+                reply_markup=ReplyKeyboardMarkup(rows, resize_keyboard=True))
             return ADMIN_MENU
         if text in lang_map:
             chosen_lang = lang_map[text]
-            context.user_data["admin_video_lang"] = chosen_lang
-            v = video_get(slot, chosen_lang)
-            status = f"Текущее видео: есть ({v['type']})" if v else "Видео: отсутствует"
-            lbl = LANG_LABELS[chosen_lang]
-            kb = ReplyKeyboardMarkup(
-                [[f"🗑 Удалить видео {lbl}"],
-                 ["🔙 Назад к языкам"]],
-                resize_keyboard=True
-            )
-            await update.message.reply_text(
-                f"📍 *{VIDEO_SLOTS[slot]}* — {lbl}\n\n"
-                f"{status}\n\n"
-                f"Отправьте видео, кружок или GIF — оно сохранится для этого языка.\n"
-                f"Или нажмите «🗑 Удалить» чтобы убрать текущее.",
-                parse_mode="Markdown", reply_markup=kb
-            )
+            key = _vkey(slot, chosen_lang)
+            context.user_data["avm"] = {"step": "slot_detail", "slot": slot, "lang": chosen_lang, "key": key}
+            await _show_slot_detail(update, key, slot, chosen_lang)
             return ADMIN_MENU
 
-    # Удаление видео для слота+языка
-    if text.startswith("🗑 Удалить видео") and context.user_data.get("admin_video_menu"):
-        slot = context.user_data.get("admin_video_slot")
-        lang = context.user_data.get("admin_video_lang")
-        if slot and lang:
-            video_delete(slot, lang)
-            context.user_data.pop("admin_video_slot", None)
-            context.user_data.pop("admin_video_lang", None)
-            context.user_data.pop("admin_video_menu", None)
-        await update.message.reply_text("✅ Видео удалено.", reply_markup=ADMIN_KB)
-        return ADMIN_MENU
+    # ── Слоты: детали слота (список видео) ────────────────
+    elif avm.get("step") == "slot_detail":
+        slot = avm.get("slot"); lang = avm.get("lang"); key = avm.get("key")
+        if text == "🔙 Назад к языкам":
+            context.user_data["avm"] = {"step": "slot_lang", "slot": slot}
+            d = _jload(_VIDEOS_F)
+            lines = []
+            for l, lbl in LANG_LABELS.items():
+                cnt = vlist_count(_vkey(slot, l))
+                lines.append(f"{lbl}: {cnt} вид.")
+            kb = ReplyKeyboardMarkup([["🇷🇺 РУ", "🇹🇲 ТМ", "🇺🇿 УЗ"], ["🔙 Назад к слотам"]], resize_keyboard=True)
+            await update.message.reply_text(
+                f"📍 *{VIDEO_SLOTS[slot]}*\n\n" + " | ".join(lines) + "\n\nВыберите язык:",
+                parse_mode="Markdown", reply_markup=kb)
+            return ADMIN_MENU
+        if text == "➕ Добавить видео":
+            context.user_data["avm"] = {"step": "slot_add_video", "slot": slot, "lang": lang, "key": key}
+            lst = vlist_get(key)
+            n = len(lst) + 1
+            kb = ReplyKeyboardMarkup([[f"Пауза: 0 сек", "Пауза: 5 сек", "Пауза: 10 сек"],
+                                       ["Пауза: 30 сек", "Пауза: 60 сек", "Пауза: 120 сек"],
+                                       ["🔙 Отмена"]], resize_keyboard=True)
+            await update.message.reply_text(
+                f"➕ Добавление видео #{n} в слот *{VIDEO_SLOTS[slot]}* ({LANG_LABELS[lang]})\n\n"
+                f"Сначала выберите *паузу перед этим видео* (после предыдущего):",
+                parse_mode="Markdown", reply_markup=kb)
+            return ADMIN_MENU
+        if text.startswith("🗑 Удалить #"):
+            try:
+                idx = int(text.split("#")[1].split(" ")[0]) - 1
+                vlist_delete_idx(key, idx)
+                await videos_save_to_sheets()
+                await update.message.reply_text(f"✅ Видео #{idx+1} удалено.")
+                await _show_slot_detail(update, key, slot, lang)
+            except Exception:
+                await update.message.reply_text("Ошибка удаления.")
+            return ADMIN_MENU
+        if text.startswith("⬆ #") or text.startswith("⬇ #"):
+            try:
+                direction = -1 if text.startswith("⬆") else 1
+                idx = int(text.split("#")[1].split(" ")[0]) - 1
+                vlist_move(key, idx, direction)
+                await videos_save_to_sheets()
+                await _show_slot_detail(update, key, slot, lang)
+            except Exception:
+                await update.message.reply_text("Ошибка перемещения.")
+            return ADMIN_MENU
+        if text == "🗑 Очистить всё":
+            vlist_set(key, [])
+            await videos_save_to_sheets()
+            await update.message.reply_text("✅ Все видео удалены.")
+            await _show_slot_detail(update, key, slot, lang)
+            return ADMIN_MENU
 
-    # Назад к выбору языка
-    if text == "🔙 Назад к языкам" and context.user_data.get("admin_video_menu"):
-        context.user_data.pop("admin_video_lang", None)
-        slot = context.user_data.get("admin_video_slot")
-        d = _jload(_VIDEOS_F)
-        lines = []
-        for lang, lbl in LANG_LABELS.items():
-            key = f"{slot}_{lang}"
-            has = "✅" if key in d else "⬜"
-            lines.append(f"{has} {lbl}")
-        kb = ReplyKeyboardMarkup(
-            [["🇷🇺 Видео РУ", "🇹🇲 Видео ТМ", "🇺🇿 Видео УЗ"],
-             ["🔙 Назад к списку"]],
-            resize_keyboard=True
-        )
-        status_text = "  |  ".join(lines)
-        await update.message.reply_text(
-            f"📍 *{VIDEO_SLOTS[slot]}*\n\n"
-            f"Статус по языкам: {status_text}\n\n"
-            f"Выберите язык:",
-            parse_mode="Markdown", reply_markup=kb
-        )
-        return ADMIN_MENU
+    # ── Слоты: выбор паузы перед добавлением видео ────────
+    elif avm.get("step") == "slot_add_video":
+        slot = avm.get("slot"); lang = avm.get("lang"); key = avm.get("key")
+        if text == "🔙 Отмена":
+            context.user_data["avm"] = {"step": "slot_detail", "slot": slot, "lang": lang, "key": key}
+            await _show_slot_detail(update, key, slot, lang)
+            return ADMIN_MENU
+        # Парсим паузу
+        if text.startswith("Пауза:"):
+            try:
+                delay = int(text.replace("Пауза:", "").replace("сек", "").strip())
+            except:
+                delay = 0
+            context.user_data["avm"]["delay"] = delay
+            context.user_data["avm"]["step"] = "slot_waiting_video"
+            await update.message.reply_text(
+                f"✅ Пауза {delay} сек.\n\n"
+                f"Теперь отправьте видео, кружок или GIF для слота "
+                f"*{VIDEO_SLOTS[slot]}* ({LANG_LABELS[lang]}):",
+                parse_mode="Markdown",
+                reply_markup=ReplyKeyboardMarkup([["🔙 Отмена"]], resize_keyboard=True))
+            return ADMIN_MENU
 
-    # Назад к списку слотов
-    if text == "🔙 Назад к списку" and context.user_data.get("admin_video_menu"):
-        context.user_data.pop("admin_video_slot", None)
-        context.user_data.pop("admin_video_lang", None)
-        rows = []
-        for slot, (label, _) in VIDEO_SLOTS_BASE.items():
-            has = "✅" if video_has_any(slot) else "⬜"
-            rows.append([f"{has} {label}"])
-        rows.append(["🔙 Назад в меню"])
-        kb = ReplyKeyboardMarkup(rows, resize_keyboard=True)
-        await update.message.reply_text("Выберите слот:", reply_markup=kb)
-        return ADMIN_MENU
+    # ── Слоты: ждём видео файл ────────────────────────────
+    elif avm.get("step") == "slot_waiting_video":
+        slot = avm.get("slot"); lang = avm.get("lang"); key = avm.get("key")
+        if text == "🔙 Отмена":
+            context.user_data["avm"] = {"step": "slot_detail", "slot": slot, "lang": lang, "key": key}
+            await _show_slot_detail(update, key, slot, lang)
+            return ADMIN_MENU
+
+    # ── Триггеры: главное ─────────────────────────────────
+    elif avm.get("step") == "triggers_main":
+        if text == "🔙 Назад":
+            context.user_data["avm"] = {"step": "main"}
+            kb = ReplyKeyboardMarkup([["📌 Видео для слотов", "⏱ Триггерные видео"], ["🔙 Назад в меню"]], resize_keyboard=True)
+            await update.message.reply_text("Главное меню видео:", reply_markup=kb)
+            return ADMIN_MENU
+        if text == "➕ Добавить триггер":
+            context.user_data["avm"] = {"step": "trig_kind"}
+            kb = ReplyKeyboardMarkup([
+                ["🚀 После старта бота"],
+                ["💤 При неактивности"],
+                ["🔙 Назад"]
+            ], resize_keyboard=True)
+            await update.message.reply_text(
+                "⏱ *Тип триггера:*\n\n"
+                "🚀 *После старта* — видео придёт через N минут после /start\n"
+                "💤 *При неактивности* — видео придёт если пользователь N минут ничего не пишет",
+                parse_mode="Markdown", reply_markup=kb)
+            return ADMIN_MENU
+        if text == "🗑 Удалить триггер":
+            triggers = get_all_triggers()
+            if not triggers:
+                await update.message.reply_text("Триггеров нет.", reply_markup=ADMIN_KB)
+                context.user_data.pop("avm", None)
+                return ADMIN_MENU
+            context.user_data["avm"] = {"step": "trig_delete"}
+            rows = []
+            for tr in triggers:
+                kind_ru = "старт" if tr["kind"] == "start" else "неакт."
+                lbl = LANG_LABELS.get(tr["lang"], tr["lang"])
+                rows.append([f"🗑 {lbl} / {kind_ru} / {tr['minutes']} мин"])
+            rows.append(["🔙 Назад"])
+            await update.message.reply_text("Выберите триггер для удаления:",
+                reply_markup=ReplyKeyboardMarkup(rows, resize_keyboard=True))
+            return ADMIN_MENU
+
+    # ── Триггеры: удаление ────────────────────────────────
+    elif avm.get("step") == "trig_delete":
+        if text == "🔙 Назад":
+            context.user_data["avm"] = {"step": "triggers_main"}
+            triggers = get_all_triggers()
+            lines = []
+            for tr in triggers:
+                kind_ru = "после старта" if tr["kind"] == "start" else "при неактивности"
+                cnt = vlist_count(tr["key"])
+                lines.append(f"• {LANG_LABELS.get(tr['lang'], tr['lang'])} — {kind_ru} — через {tr['minutes']} мин ({cnt} вид.)")
+            tlist = "\n".join(lines) if lines else "Триггеров пока нет."
+            kb = ReplyKeyboardMarkup([["➕ Добавить триггер", "🗑 Удалить триггер"], ["🔙 Назад"]], resize_keyboard=True)
+            await update.message.reply_text(f"⏱ *Триггерные видео*\n\n{tlist}", parse_mode="Markdown", reply_markup=kb)
+            return ADMIN_MENU
+        if text.startswith("🗑 "):
+            triggers = get_all_triggers()
+            for tr in triggers:
+                kind_ru = "старт" if tr["kind"] == "start" else "неакт."
+                lbl = LANG_LABELS.get(tr["lang"], tr["lang"])
+                if f"🗑 {lbl} / {kind_ru} / {tr['minutes']} мин" == text:
+                    vlist_set(tr["key"], [])
+                    await videos_save_to_sheets()
+                    await update.message.reply_text(f"✅ Триггер удалён.", reply_markup=ADMIN_KB)
+                    context.user_data.pop("avm", None)
+                    return ADMIN_MENU
+
+    # ── Триггеры: выбор типа ──────────────────────────────
+    elif avm.get("step") == "trig_kind":
+        if text == "🔙 Назад":
+            context.user_data["avm"] = {"step": "triggers_main"}
+            # ... (показываем список триггеров)
+            return ADMIN_MENU
+        kind_map = {"🚀 После старта бота": "start", "💤 При неактивности": "idle"}
+        if text in kind_map:
+            kind = kind_map[text]
+            context.user_data["avm"] = {"step": "trig_lang", "kind": kind}
+            kb = ReplyKeyboardMarkup([["🇷🇺 РУ", "🇹🇲 ТМ", "🇺🇿 УЗ"], ["🔙 Назад"]], resize_keyboard=True)
+            await update.message.reply_text("Для какого языка этот триггер?", reply_markup=kb)
+            return ADMIN_MENU
+
+    # ── Триггеры: выбор языка ─────────────────────────────
+    elif avm.get("step") == "trig_lang":
+        lang_map2 = {"🇷🇺 РУ": "ru", "🇹🇲 ТМ": "tk", "🇺🇿 УЗ": "uz"}
+        if text in lang_map2:
+            context.user_data["avm"]["lang"] = lang_map2[text]
+            context.user_data["avm"]["step"] = "trig_minutes"
+            kb = ReplyKeyboardMarkup([
+                ["30 мин", "1 час", "2 часа"],
+                ["6 часов", "12 часов", "24 часа (1 день)"],
+                ["🔙 Назад"]
+            ], resize_keyboard=True)
+            await update.message.reply_text(
+                "⏱ Через сколько времени отправить видео?\n"
+                "(можно написать число минут вручную, например: *45*)",
+                parse_mode="Markdown", reply_markup=kb)
+            return ADMIN_MENU
+
+    # ── Триггеры: выбор времени ───────────────────────────
+    elif avm.get("step") == "trig_minutes":
+        time_map = {"30 мин": 30, "1 час": 60, "2 часа": 120,
+                    "6 часов": 360, "12 часов": 720, "24 часа (1 день)": 1440}
+        minutes = None
+        if text in time_map:
+            minutes = time_map[text]
+        else:
+            try:
+                minutes = int(text.strip())
+            except:
+                pass
+        if minutes:
+            kind = avm.get("kind"); lang = avm.get("lang")
+            key = trigger_key(kind, lang, minutes)
+            context.user_data["avm"] = {
+                "step": "trig_add_video", "kind": kind, "lang": lang,
+                "minutes": minutes, "key": key, "delay": 0
+            }
+            lst = vlist_get(key)
+            n = len(lst) + 1
+            kind_ru = "после старта" if kind == "start" else "при неактивности"
+            kb = ReplyKeyboardMarkup([
+                ["Пауза: 0 сек", "Пауза: 5 сек", "Пауза: 10 сек"],
+                ["Пауза: 30 сек", "Пауза: 60 сек", "Пауза: 120 сек"],
+                ["🔙 Отмена"]
+            ], resize_keyboard=True)
+            await update.message.reply_text(
+                f"✅ Триггер: {LANG_LABELS[lang]} / {kind_ru} / через {minutes} мин\n\n"
+                f"Видео #{n} — выберите паузу перед ним:",
+                parse_mode="Markdown", reply_markup=kb)
+            return ADMIN_MENU
+
+    # ── Триггеры: пауза перед видео ───────────────────────
+    elif avm.get("step") == "trig_add_video":
+        key = avm.get("key"); kind = avm.get("kind"); lang = avm.get("lang"); minutes = avm.get("minutes")
+        if text == "🔙 Отмена":
+            context.user_data["avm"] = {"step": "triggers_main"}
+            return ADMIN_MENU
+        if text.startswith("Пауза:"):
+            try:
+                delay = int(text.replace("Пауза:", "").replace("сек", "").strip())
+            except:
+                delay = 0
+            context.user_data["avm"]["delay"] = delay
+            context.user_data["avm"]["step"] = "trig_waiting_video"
+            kind_ru = "после старта" if kind == "start" else "при неактивности"
+            await update.message.reply_text(
+                f"✅ Пауза {delay} сек.\n\n"
+                f"Теперь отправьте видео для триггера "
+                f"*{LANG_LABELS[lang]} / {kind_ru} / {minutes} мин*:",
+                parse_mode="Markdown",
+                reply_markup=ReplyKeyboardMarkup([["🔙 Отмена"]], resize_keyboard=True))
+            return ADMIN_MENU
+
+    # ── Триггеры: ждём видео ──────────────────────────────
+    elif avm.get("step") == "trig_waiting_video":
+        if text == "🔙 Отмена":
+            context.user_data["avm"] = {"step": "triggers_main"}
+            return ADMIN_MENU
+
+    # ── Триггеры: подтверждение после добавления видео ────
+    elif avm.get("step") == "trig_confirm":
+        key = avm.get("key"); kind = avm.get("kind")
+        lang = avm.get("lang"); minutes = avm.get("minutes")
+        if text == "✅ Готово — сохранить триггер":
+            context.user_data.pop("avm", None)
+            kind_ru = "после старта" if kind == "start" else "при неактивности"
+            cnt = vlist_count(key)
+            await update.message.reply_text(
+                f"✅ Триггер сохранён!\n\n"
+                f"*{LANG_LABELS.get(lang,lang)} / {kind_ru} / через {minutes} мин*\n"
+                f"Видео в очереди: {cnt}\n\n"
+                f"Триггер будет автоматически работать для новых пользователей.",
+                parse_mode="Markdown", reply_markup=ADMIN_KB
+            )
+            return ADMIN_MENU
+        if text == "🔙 Отмена":
+            context.user_data["avm"] = {"step": "triggers_main"}
+            return ADMIN_MENU
+        if text == "➕ Добавить ещё видео в этот триггер":
+            context.user_data["avm"]["step"] = "trig_add_video"
+            lst = vlist_get(key)
+            n = len(lst) + 1
+            kb = ReplyKeyboardMarkup([
+                ["Пауза: 0 сек", "Пауза: 5 сек", "Пауза: 10 сек"],
+                ["Пауза: 30 сек", "Пауза: 60 сек", "Пауза: 120 сек"],
+                ["🔙 Отмена"]
+            ], resize_keyboard=True)
+            await update.message.reply_text(
+                f"➕ Добавление видео #{n} в триггер — выберите паузу:",
+                reply_markup=kb)
+            return ADMIN_MENU
 
 
     # Новость — сохраняем и сразу отправляем всем партнёрам
@@ -3327,44 +3807,63 @@ async def admin_photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     return ADMIN_MENU
 
 async def admin_circle_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Получаем кружок/видео от admin — либо рассылка, либо привязка к слоту."""
+    """Получаем видео/кружок от админа — сохраняем в слот/триггер или рассылаем."""
     if update.effective_user.id != MANAGER_CHAT_ID:
         return
 
     msg = update.message
-
-    # Определяем тип файла
     if msg.video_note:
-        file_id = msg.video_note.file_id
-        vtype   = "video_note"
+        file_id = msg.video_note.file_id; vtype = "video_note"
     elif msg.video:
-        file_id = msg.video.file_id
-        vtype   = "video"
+        file_id = msg.video.file_id; vtype = "video"
     elif msg.animation:
-        file_id = msg.animation.file_id
-        vtype   = "animation"
+        file_id = msg.animation.file_id; vtype = "animation"
     else:
         return
 
-    # Режим привязки к слоту
-    slot = context.user_data.get("admin_video_slot")
-    lang = context.user_data.get("admin_video_lang")
-    if context.user_data.get("admin_video_menu") and slot and lang:
-        video_set(slot, file_id, vtype, lang)
-        context.user_data.pop("admin_video_slot", None)
-        context.user_data.pop("admin_video_lang", None)
-        context.user_data.pop("admin_video_menu", None)
-        label = VIDEO_SLOTS.get(slot, slot)
-        lang_lbl = LANG_LABELS.get(lang, lang)
+    avm = context.user_data.get("avm", {})
+
+    # ── Ожидаем видео для слота ──
+    if avm.get("step") == "slot_waiting_video":
+        slot = avm.get("slot"); lang = avm.get("lang")
+        key  = avm.get("key"); delay = avm.get("delay", 0)
+        vlist_add(key, file_id, vtype, delay=delay)
+        await videos_save_to_sheets()
+        context.user_data["avm"] = {"step": "slot_detail", "slot": slot, "lang": lang, "key": key}
         await update.message.reply_text(
-            f"✅ Видео сохранено для слота:\n*{label}* — {lang_lbl}\n\n"
-            f"Тип: {vtype}\nFile ID: `{file_id[:30]}...`",
-            parse_mode="Markdown",
-            reply_markup=ADMIN_KB
+            f"✅ Видео добавлено в слот *{VIDEO_SLOTS[slot]}* ({LANG_LABELS[lang]})\n"
+            f"Пауза перед ним: {delay} сек.\nFile ID: `{file_id[:30]}...`",
+            parse_mode="Markdown"
         )
+        await _show_slot_detail(update, key, slot, lang)
         return ADMIN_MENU
 
-    # Режим рассылки кружка
+    # ── Ожидаем видео для триггера ──
+    if avm.get("step") == "trig_waiting_video":
+        key = avm.get("key"); kind = avm.get("kind")
+        lang = avm.get("lang"); minutes = avm.get("minutes")
+        delay = avm.get("delay", 0)
+        vlist_add(key, file_id, vtype, delay=delay)
+        await videos_save_to_sheets()
+        kind_ru = "после старта" if kind == "start" else "при неактивности"
+        lst = vlist_get(key)
+        # Спрашиваем — добавить ещё или закончить
+        kb = ReplyKeyboardMarkup([
+            ["➕ Добавить ещё видео в этот триггер"],
+            ["✅ Готово — сохранить триггер"],
+            ["🔙 Отмена"]
+        ], resize_keyboard=True)
+        await update.message.reply_text(
+            f"✅ Видео #{len(lst)} добавлено в триггер!\n"
+            f"*{LANG_LABELS[lang]} / {kind_ru} / {minutes} мин*\n\n"
+            f"Всего видео в триггере: {len(lst)}\n\n"
+            f"Хотите добавить ещё одно видео (с паузой) или сохранить?",
+            parse_mode="Markdown", reply_markup=kb
+        )
+        context.user_data["avm"]["step"] = "trig_confirm"
+        return ADMIN_MENU
+
+    # ── Режим рассылки кружка ──
     if context.user_data.pop("admin_circle", False):
         if vtype != "video_note":
             await update.message.reply_text("Это не кружок. Попробуйте снова.", reply_markup=ADMIN_KB)
