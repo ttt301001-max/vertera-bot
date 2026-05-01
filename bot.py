@@ -206,47 +206,84 @@ async def quiz_load():
 
 # ─── Хранилище видео ─────────────────────────────────────────
 
-VIDEO_SLOTS = {
-    "welcome":      "🌿 Приветствие (после выбора языка)",
-    "buy":          "🛒 Купить продукт",
-    "business":     "💼 Бизнес с Vertera",
-    "catalog":      "📖 Каталог",
-    "anketa_done":  "📋 После заполнения анкеты",
-    "partner_ok":   "🤝 Партнёр одобрен",
-    "academy":      "🎓 Академия гомеостаза",
-    "learn_day_1":  "📚 Обучение — День 1",
-    "learn_day_2":  "📚 Обучение — День 2",
-    "learn_day_3":  "📚 Обучение — День 3",
-    "learn_day_4":  "📚 Обучение — День 4",
-    "learn_day_5":  "📚 Обучение — День 5",
-    "learn_day_6":  "📚 Обучение — День 6",
-    "learn_day_7":  "📚 Обучение — День 7",
-    "mkt_day_1":    "📊 Маркетинг — День 1",
-    "mkt_day_2":    "📊 Маркетинг — День 2",
-    "mkt_day_3":    "📊 Маркетинг — День 3",
-    "mkt_day_4":    "📊 Маркетинг — День 4",
-    "mkt_day_5":    "📊 Маркетинг — День 5",
-    "mkt_day_6":    "📊 Маркетинг — День 6",
-    "mkt_day_7":    "📊 Маркетинг — День 7",
+# Слоты с поддержкой языков: ключ -> (базовое имя, поддерживает языки?)
+# Для языкозависимых слотов хранятся ключи: slot_ru / slot_tk / slot_uz
+# Для языконезависимых — просто slot
+
+LANG_LABELS = {"ru": "🇷🇺 РУ", "tk": "🇹🇲 ТМ", "uz": "🇺🇿 УЗ"}
+
+VIDEO_SLOTS_BASE = {
+    "welcome":      ("🌿 Приветствие (после выбора языка)",  True),
+    "buy":          ("🛒 Купить продукт",                     True),
+    "business":     ("💼 Бизнес с Vertera",                   True),
+    "catalog":      ("📖 Каталог",                            True),
+    "anketa_done":  ("📋 После заполнения анкеты",            True),
+    "partner_ok":   ("🤝 Партнёр одобрен",                    True),
+    "academy":      ("🎓 Академия гомеостаза",                True),
+    "learn_day_1":  ("📚 Обучение — День 1",                  True),
+    "learn_day_2":  ("📚 Обучение — День 2",                  True),
+    "learn_day_3":  ("📚 Обучение — День 3",                  True),
+    "learn_day_4":  ("📚 Обучение — День 4",                  True),
+    "learn_day_5":  ("📚 Обучение — День 5",                  True),
+    "learn_day_6":  ("📚 Обучение — День 6",                  True),
+    "learn_day_7":  ("📚 Обучение — День 7",                  True),
+    "mkt_day_1":    ("📊 Маркетинг — День 1",                 True),
+    "mkt_day_2":    ("📊 Маркетинг — День 2",                 True),
+    "mkt_day_3":    ("📊 Маркетинг — День 3",                 True),
+    "mkt_day_4":    ("📊 Маркетинг — День 4",                 True),
+    "mkt_day_5":    ("📊 Маркетинг — День 5",                 True),
+    "mkt_day_6":    ("📊 Маркетинг — День 6",                 True),
+    "mkt_day_7":    ("📊 Маркетинг — День 7",                 True),
 }
 
-def video_get(slot: str) -> dict:
-    """Возвращает {'file_id': ..., 'type': 'video'|'video_note'} или {}."""
-    return _jload(_VIDEOS_F).get(slot, {})
+# Плоский словарь для обратной совместимости
+VIDEO_SLOTS = {k: v[0] for k, v in VIDEO_SLOTS_BASE.items()}
 
-def video_set(slot: str, file_id: str, vtype: str):
+def _video_key(slot: str, lang: str = None) -> str:
+    """Возвращает ключ для хранения видео. Если слот поддерживает языки и lang задан — slot_lang."""
+    info = VIDEO_SLOTS_BASE.get(slot)
+    if info and info[1] and lang:
+        return f"{slot}_{lang}"
+    return slot
+
+def video_get(slot: str, lang: str = None) -> dict:
+    """Возвращает {'file_id': ..., 'type': ...} для слота (с учётом языка, или fallback на общий)."""
     d = _jload(_VIDEOS_F)
-    d[slot] = {"file_id": file_id, "type": vtype}
+    if lang:
+        key = _video_key(slot, lang)
+        if key in d:
+            return d[key]
+        # Fallback: попробуем без языка
+        if slot in d:
+            return d[slot]
+        return {}
+    return d.get(slot, {})
+
+def video_set(slot: str, file_id: str, vtype: str, lang: str = None):
+    d = _jload(_VIDEOS_F)
+    key = _video_key(slot, lang)
+    d[key] = {"file_id": file_id, "type": vtype}
     _jsave(_VIDEOS_F, d)
 
-def video_delete(slot: str):
+def video_delete(slot: str, lang: str = None):
     d = _jload(_VIDEOS_F)
-    d.pop(slot, None)
+    key = _video_key(slot, lang)
+    d.pop(key, None)
     _jsave(_VIDEOS_F, d)
 
-async def send_slot_video(bot, chat_id: int, slot: str):
-    """Отправляет видео для слота если оно есть."""
-    v = video_get(slot)
+def video_has_any(slot: str) -> bool:
+    """Проверяет, есть ли хоть одно видео для слота (любой язык)."""
+    d = _jload(_VIDEOS_F)
+    if slot in d:
+        return True
+    for lang in ("ru", "tk", "uz"):
+        if f"{slot}_{lang}" in d:
+            return True
+    return False
+
+async def send_slot_video(bot, chat_id: int, slot: str, lang: str = None):
+    """Отправляет видео для слота если оно есть. Учитывает язык пользователя."""
+    v = video_get(slot, lang)
     if not v or not v.get("file_id"):
         return
     try:
@@ -257,7 +294,7 @@ async def send_slot_video(bot, chat_id: int, slot: str):
         else:
             await bot.send_video(chat_id=chat_id, video=v["file_id"])
     except Exception as e:
-        logger.error(f"send_slot_video {slot}: {e}")
+        logger.error(f"send_slot_video {slot} (lang={lang}): {e}")
 
 async def progress_sync_to_sheets(uid: int, day: int, name: str, uname: str):
     """Сохраняет прогресс в Google Sheets."""
@@ -988,7 +1025,7 @@ async def select_lang(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await user_register_sheets(user.id, lang, country, user.full_name or uname_r, uname_r)
 
     t = TEXTS[lang]
-    await send_slot_video(context.bot, user.id, "welcome")
+    await send_slot_video(context.bot, user.id, "welcome", lang)
     await update.message.reply_text(
         t["welcome"],
         parse_mode="Markdown",
@@ -1026,7 +1063,7 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Кнопка каталога — Mini App
     if text in [t["catalog"], "📖 Каталог", "📖 Katalog"]:
-        await send_slot_video(context.bot, user.id, "catalog")
+        await send_slot_video(context.bot, user.id, "catalog", lang)
         mini_app_text = {
             "ru": "📖 Откройте наш каталог в Mini App:\n\n👉 https://t.me/Verteratkmbot/vertera_tkm\n\nТам все продукты с фото, описаниями и ценами 🌿",
             "tk": "📖 Katalogumuzy Mini App-da açyň:\n\n👉 https://t.me/Verteratkmbot/vertera_tkm\n\nOrada ähli önümler suratlar, beýanlar we bahalar bilen 🌿",
@@ -1048,7 +1085,7 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Кнопка купить продукт
     if text in [t["buy"], "🛒 Купить продукт", "🛒 Önüm satyn almak", "🛒 Mahsulot sotib olish"]:
-        await send_slot_video(context.bot, user.id, "buy")
+        await send_slot_video(context.bot, user.id, "buy", lang)
         try:
             country_label = "Туркменистан 🇹🇲" if country == "TKM" else "Узбекистан 🇺🇿"
             uname = f"@{user.username}" if user.username else str(user.id)
@@ -1088,7 +1125,7 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Кнопка бизнес
     if text in [t["business"], "💼 Бизнес с Vertera", "💼 Vertera bilen iş", "💼 Vertera bilan biznes"]:
-        await send_slot_video(context.bot, user.id, "business")
+        await send_slot_video(context.bot, user.id, "business", lang)
         try:
             country_label = "Туркменистан 🇹🇲" if country == "TKM" else "Узбекистан 🇺🇿"
             uname = f"@{user.username}" if user.username else str(user.id)
@@ -1379,7 +1416,7 @@ async def anketa_interest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Sponsor notify error: {e}")
 
-    await send_slot_video(context.bot, user.id, "anketa_done")
+    await send_slot_video(context.bot, user.id, "anketa_done", lang)
     await update.message.reply_text(
         t["anketa_done"].format(sponsor=SPONSOR_USERNAME, phone=phone),
         reply_markup=get_main_keyboard(lang)
@@ -2352,6 +2389,23 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     if text == p["btn_learn"]:
         day = progress_get(user.id)
         if day == 0:
+            # Проверяем в Sheets — вдруг данные не загрузились при старте
+            try:
+                async with httpx.AsyncClient(follow_redirects=True) as c:
+                    resp = await c.post(GOOGLE_SHEET_URL,
+                                        json={"type": "get_progress", "user_id": str(user.id)}, timeout=10)
+                    rdata = resp.json()
+                    if rdata.get("status") == "ok" and rdata.get("progress"):
+                        for row in rdata["progress"]:
+                            if str(row.get("user_id","")).strip() == str(user.id):
+                                saved_day = int(row.get("day", 0))
+                                if saved_day > 0:
+                                    progress_set(user.id, saved_day)
+                                    day = saved_day
+                                break
+            except Exception:
+                pass
+        if day == 0:
             # Первый вход — запускаем День 1
             progress_set(user.id, 1)
             await progress_sync_to_sheets(user.id, 1, user.full_name or "", f"@{user.username}" if user.username else str(user.id))
@@ -2368,7 +2422,7 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             [[done_btn], [p["btn_webinar"]], [repeat_btn], [p["btn_back"]]],
             resize_keyboard=True
         )
-        await send_slot_video(context.bot, user.id, f"learn_day_{day}")
+        await send_slot_video(context.bot, user.id, f"learn_day_{day}", lang)
         await update.message.reply_text(day_text, parse_mode="Markdown", reply_markup=learn_kb)
         return PARTNER_MENU
 
@@ -2433,7 +2487,7 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # Академия гомеостаза
     if text == p.get("btn_academy",""):
-        await send_slot_video(context.bot, user.id, "academy")
+        await send_slot_video(context.bot, user.id, "academy", lang)
         await update.message.reply_text(
             ACADEMY_CONTENT.get(lang, ACADEMY_CONTENT["ru"]),
             parse_mode="Markdown",
@@ -2454,7 +2508,7 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             await update.message.reply_text(MKT_ALL_DONE.get(lang,MKT_ALL_DONE["ru"]),reply_markup=kb)
             return PARTNER_MENU
         mkt_kb = ReplyKeyboardMarkup([[MKT_DONE_BTN.get(lang,MKT_DONE_BTN["ru"])],[MKT_REPEAT_BTN.get(lang,MKT_REPEAT_BTN["ru"])],[p["btn_back"]]],resize_keyboard=True)
-        await send_slot_video(context.bot, user.id, f"mkt_day_{day}")
+        await send_slot_video(context.bot, user.id, f"mkt_day_{day}", lang)
         await update.message.reply_text(MKT_DAYS[day].get(lang,MKT_DAYS[day]["ru"]),parse_mode="Markdown",reply_markup=mkt_kb)
         return PARTNER_MENU
 
@@ -2827,7 +2881,7 @@ async def partner_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Сохраняем в Google Sheets (постоянное хранение)
     await partner_add_sheets(uid, info.get("name",""), info.get("cid",""), lang, uname)
     try:
-        await send_slot_video(context.bot, uid, "partner_ok")
+        await send_slot_video(context.bot, uid, "partner_ok", lang)
         await context.bot.send_message(
             chat_id=uid, text=p["approved"],
             reply_markup=get_partner_kb(lang)
@@ -2989,11 +3043,11 @@ async def admin_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text == "🎬 Управление видео":
         context.user_data["admin_video_menu"] = True
         context.user_data.pop("admin_video_slot", None)
+        context.user_data.pop("admin_video_lang", None)
         # Показываем список слотов с иконкой наличия видео
-        videos = _jload(_VIDEOS_F)
         rows = []
-        for slot, label in VIDEO_SLOTS.items():
-            has = "✅" if slot in videos else "⬜"
+        for slot, (label, _) in VIDEO_SLOTS_BASE.items():
+            has = "✅" if video_has_any(slot) else "⬜"
             rows.append([f"{has} {label}"])
         rows.append(["🔙 Назад в меню"])
         kb = ReplyKeyboardMarkup(rows, resize_keyboard=True)
@@ -3005,7 +3059,7 @@ async def admin_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return ADMIN_MENU
 
-    # Обработка выбора слота видео
+    # Обработка выбора слота видео — сначала выбираем слот, потом язык
     if context.user_data.get("admin_video_menu") and not context.user_data.get("admin_video_slot"):
         if text == "🔙 Назад в меню":
             context.user_data.pop("admin_video_menu", None)
@@ -3013,50 +3067,117 @@ async def admin_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return ADMIN_MENU
         # Ищем выбранный слот
         chosen_slot = None
-        for slot, label in VIDEO_SLOTS.items():
+        for slot, (label, _) in VIDEO_SLOTS_BASE.items():
             if label in text:
                 chosen_slot = slot
                 break
         if chosen_slot:
             context.user_data["admin_video_slot"] = chosen_slot
-            v = video_get(chosen_slot)
-            status = f"Текущее видео: есть (type: {v['type']})" if v else "Видео: отсутствует"
+            context.user_data.pop("admin_video_lang", None)
+            # Показываем выбор языка
+            d = _jload(_VIDEOS_F)
+            lines = []
+            for lang, lbl in LANG_LABELS.items():
+                key = f"{chosen_slot}_{lang}"
+                has = "✅" if key in d else "⬜"
+                lines.append(f"{has} {lbl}")
             kb = ReplyKeyboardMarkup(
-                [["🗑 Удалить видео для этого слота"],
+                [[f"🇷🇺 Видео РУ", f"🇹🇲 Видео ТМ", f"🇺🇿 Видео УЗ"],
                  ["🔙 Назад к списку"]],
                 resize_keyboard=True
             )
+            status_text = "  |  ".join(lines)
             await update.message.reply_text(
                 f"📍 *{VIDEO_SLOTS[chosen_slot]}*\n\n"
+                f"Статус по языкам: {status_text}\n\n"
+                f"Выберите язык, для которого хотите загрузить видео:",
+                parse_mode="Markdown", reply_markup=kb
+            )
+            return ADMIN_MENU
+
+    # Обработка выбора языка для слота
+    if context.user_data.get("admin_video_menu") and context.user_data.get("admin_video_slot") and not context.user_data.get("admin_video_lang"):
+        slot = context.user_data["admin_video_slot"]
+        lang_map = {"🇷🇺 Видео РУ": "ru", "🇹🇲 Видео ТМ": "tk", "🇺🇿 Видео УЗ": "uz"}
+        if text == "🔙 Назад к списку":
+            context.user_data.pop("admin_video_slot", None)
+            rows = []
+            for s, (label, _) in VIDEO_SLOTS_BASE.items():
+                has = "✅" if video_has_any(s) else "⬜"
+                rows.append([f"{has} {label}"])
+            rows.append(["🔙 Назад в меню"])
+            kb = ReplyKeyboardMarkup(rows, resize_keyboard=True)
+            await update.message.reply_text("Выберите слот:", reply_markup=kb)
+            return ADMIN_MENU
+        if text in lang_map:
+            chosen_lang = lang_map[text]
+            context.user_data["admin_video_lang"] = chosen_lang
+            v = video_get(slot, chosen_lang)
+            status = f"Текущее видео: есть ({v['type']})" if v else "Видео: отсутствует"
+            lbl = LANG_LABELS[chosen_lang]
+            kb = ReplyKeyboardMarkup(
+                [[f"🗑 Удалить видео {lbl}"],
+                 ["🔙 Назад к языкам"]],
+                resize_keyboard=True
+            )
+            await update.message.reply_text(
+                f"📍 *{VIDEO_SLOTS[slot]}* — {lbl}\n\n"
                 f"{status}\n\n"
-                f"Отправьте видео, кружок или GIF — оно привяжется к этому сообщению.\n"
+                f"Отправьте видео, кружок или GIF — оно сохранится для этого языка.\n"
                 f"Или нажмите «🗑 Удалить» чтобы убрать текущее.",
                 parse_mode="Markdown", reply_markup=kb
             )
             return ADMIN_MENU
 
-    # Удаление видео для слота
-    if text == "🗑 Удалить видео для этого слота":
+    # Удаление видео для слота+языка
+    if text.startswith("🗑 Удалить видео") and context.user_data.get("admin_video_menu"):
         slot = context.user_data.get("admin_video_slot")
-        if slot:
-            video_delete(slot)
+        lang = context.user_data.get("admin_video_lang")
+        if slot and lang:
+            video_delete(slot, lang)
             context.user_data.pop("admin_video_slot", None)
+            context.user_data.pop("admin_video_lang", None)
             context.user_data.pop("admin_video_menu", None)
         await update.message.reply_text("✅ Видео удалено.", reply_markup=ADMIN_KB)
+        return ADMIN_MENU
+
+    # Назад к выбору языка
+    if text == "🔙 Назад к языкам" and context.user_data.get("admin_video_menu"):
+        context.user_data.pop("admin_video_lang", None)
+        slot = context.user_data.get("admin_video_slot")
+        d = _jload(_VIDEOS_F)
+        lines = []
+        for lang, lbl in LANG_LABELS.items():
+            key = f"{slot}_{lang}"
+            has = "✅" if key in d else "⬜"
+            lines.append(f"{has} {lbl}")
+        kb = ReplyKeyboardMarkup(
+            [["🇷🇺 Видео РУ", "🇹🇲 Видео ТМ", "🇺🇿 Видео УЗ"],
+             ["🔙 Назад к списку"]],
+            resize_keyboard=True
+        )
+        status_text = "  |  ".join(lines)
+        await update.message.reply_text(
+            f"📍 *{VIDEO_SLOTS[slot]}*\n\n"
+            f"Статус по языкам: {status_text}\n\n"
+            f"Выберите язык:",
+            parse_mode="Markdown", reply_markup=kb
+        )
         return ADMIN_MENU
 
     # Назад к списку слотов
     if text == "🔙 Назад к списку" and context.user_data.get("admin_video_menu"):
         context.user_data.pop("admin_video_slot", None)
-        videos = _jload(_VIDEOS_F)
+        context.user_data.pop("admin_video_lang", None)
         rows = []
-        for slot, label in VIDEO_SLOTS.items():
-            has = "✅" if slot in videos else "⬜"
+        for slot, (label, _) in VIDEO_SLOTS_BASE.items():
+            has = "✅" if video_has_any(slot) else "⬜"
             rows.append([f"{has} {label}"])
         rows.append(["🔙 Назад в меню"])
         kb = ReplyKeyboardMarkup(rows, resize_keyboard=True)
         await update.message.reply_text("Выберите слот:", reply_markup=kb)
         return ADMIN_MENU
+
 
     # Новость — сохраняем и сразу отправляем всем партнёрам
     if text == "📰 Добавить новость":
@@ -3227,13 +3348,16 @@ async def admin_circle_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # Режим привязки к слоту
     slot = context.user_data.get("admin_video_slot")
-    if context.user_data.get("admin_video_menu") and slot:
-        video_set(slot, file_id, vtype)
+    lang = context.user_data.get("admin_video_lang")
+    if context.user_data.get("admin_video_menu") and slot and lang:
+        video_set(slot, file_id, vtype, lang)
         context.user_data.pop("admin_video_slot", None)
+        context.user_data.pop("admin_video_lang", None)
         context.user_data.pop("admin_video_menu", None)
         label = VIDEO_SLOTS.get(slot, slot)
+        lang_lbl = LANG_LABELS.get(lang, lang)
         await update.message.reply_text(
-            f"✅ Видео сохранено для слота:\n*{label}*\n\n"
+            f"✅ Видео сохранено для слота:\n*{label}* — {lang_lbl}\n\n"
             f"Тип: {vtype}\nFile ID: `{file_id[:30]}...`",
             parse_mode="Markdown",
             reply_markup=ADMIN_KB
