@@ -40,6 +40,7 @@ _NEWS_F      = pathlib.Path("/tmp/vrt_news.json")
 _PROGRESS_F  = pathlib.Path("/tmp/vrt_progress.json")
 _MKTPROG_F   = pathlib.Path("/tmp/vrt_mkt_progress.json")
 _QUIZ_F      = pathlib.Path("/tmp/vrt_quiz.json")
+_VIDEOS_F    = pathlib.Path("/tmp/vrt_videos.json")
 _MKTPROG_F   = pathlib.Path("/tmp/vrt_mkt_progress.json")
 _QUIZ_F      = pathlib.Path("/tmp/vrt_quiz.json")
 _USERS_F     = pathlib.Path("/tmp/vrt_users.json")
@@ -201,6 +202,62 @@ async def quiz_load():
                 _jsave(_QUIZ_F, d)
     except Exception as e:
         logger.error(f"quiz_load: {e}")
+
+
+# ─── Хранилище видео ─────────────────────────────────────────
+
+VIDEO_SLOTS = {
+    "welcome":      "🌿 Приветствие (после выбора языка)",
+    "buy":          "🛒 Купить продукт",
+    "business":     "💼 Бизнес с Vertera",
+    "catalog":      "📖 Каталог",
+    "anketa_done":  "📋 После заполнения анкеты",
+    "partner_ok":   "🤝 Партнёр одобрен",
+    "academy":      "🎓 Академия гомеостаза",
+    "learn_day_1":  "📚 Обучение — День 1",
+    "learn_day_2":  "📚 Обучение — День 2",
+    "learn_day_3":  "📚 Обучение — День 3",
+    "learn_day_4":  "📚 Обучение — День 4",
+    "learn_day_5":  "📚 Обучение — День 5",
+    "learn_day_6":  "📚 Обучение — День 6",
+    "learn_day_7":  "📚 Обучение — День 7",
+    "mkt_day_1":    "📊 Маркетинг — День 1",
+    "mkt_day_2":    "📊 Маркетинг — День 2",
+    "mkt_day_3":    "📊 Маркетинг — День 3",
+    "mkt_day_4":    "📊 Маркетинг — День 4",
+    "mkt_day_5":    "📊 Маркетинг — День 5",
+    "mkt_day_6":    "📊 Маркетинг — День 6",
+    "mkt_day_7":    "📊 Маркетинг — День 7",
+}
+
+def video_get(slot: str) -> dict:
+    """Возвращает {'file_id': ..., 'type': 'video'|'video_note'} или {}."""
+    return _jload(_VIDEOS_F).get(slot, {})
+
+def video_set(slot: str, file_id: str, vtype: str):
+    d = _jload(_VIDEOS_F)
+    d[slot] = {"file_id": file_id, "type": vtype}
+    _jsave(_VIDEOS_F, d)
+
+def video_delete(slot: str):
+    d = _jload(_VIDEOS_F)
+    d.pop(slot, None)
+    _jsave(_VIDEOS_F, d)
+
+async def send_slot_video(bot, chat_id: int, slot: str):
+    """Отправляет видео для слота если оно есть."""
+    v = video_get(slot)
+    if not v or not v.get("file_id"):
+        return
+    try:
+        if v["type"] == "video_note":
+            await bot.send_video_note(chat_id=chat_id, video_note=v["file_id"])
+        elif v["type"] == "animation":
+            await bot.send_animation(chat_id=chat_id, animation=v["file_id"])
+        else:
+            await bot.send_video(chat_id=chat_id, video=v["file_id"])
+    except Exception as e:
+        logger.error(f"send_slot_video {slot}: {e}")
 
 async def progress_sync_to_sheets(uid: int, day: int, name: str, uname: str):
     """Сохраняет прогресс в Google Sheets."""
@@ -931,6 +988,7 @@ async def select_lang(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await user_register_sheets(user.id, lang, country, user.full_name or uname_r, uname_r)
 
     t = TEXTS[lang]
+    await send_slot_video(context.bot, user.id, "welcome")
     await update.message.reply_text(
         t["welcome"],
         parse_mode="Markdown",
@@ -968,6 +1026,7 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Кнопка каталога — Mini App
     if text in [t["catalog"], "📖 Каталог", "📖 Katalog"]:
+        await send_slot_video(context.bot, user.id, "catalog")
         mini_app_text = {
             "ru": "📖 Откройте наш каталог в Mini App:\n\n👉 https://t.me/Verteratkmbot/vertera_tkm\n\nТам все продукты с фото, описаниями и ценами 🌿",
             "tk": "📖 Katalogumuzy Mini App-da açyň:\n\n👉 https://t.me/Verteratkmbot/vertera_tkm\n\nOrada ähli önümler suratlar, beýanlar we bahalar bilen 🌿",
@@ -989,6 +1048,7 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Кнопка купить продукт
     if text in [t["buy"], "🛒 Купить продукт", "🛒 Önüm satyn almak", "🛒 Mahsulot sotib olish"]:
+        await send_slot_video(context.bot, user.id, "buy")
         try:
             country_label = "Туркменистан 🇹🇲" if country == "TKM" else "Узбекистан 🇺🇿"
             uname = f"@{user.username}" if user.username else str(user.id)
@@ -1028,6 +1088,7 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Кнопка бизнес
     if text in [t["business"], "💼 Бизнес с Vertera", "💼 Vertera bilen iş", "💼 Vertera bilan biznes"]:
+        await send_slot_video(context.bot, user.id, "business")
         try:
             country_label = "Туркменистан 🇹🇲" if country == "TKM" else "Узбекистан 🇺🇿"
             uname = f"@{user.username}" if user.username else str(user.id)
@@ -1318,6 +1379,7 @@ async def anketa_interest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Sponsor notify error: {e}")
 
+    await send_slot_video(context.bot, user.id, "anketa_done")
     await update.message.reply_text(
         t["anketa_done"].format(sponsor=SPONSOR_USERNAME, phone=phone),
         reply_markup=get_main_keyboard(lang)
@@ -2306,6 +2368,7 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             [[done_btn], [p["btn_webinar"]], [repeat_btn], [p["btn_back"]]],
             resize_keyboard=True
         )
+        await send_slot_video(context.bot, user.id, f"learn_day_{day}")
         await update.message.reply_text(day_text, parse_mode="Markdown", reply_markup=learn_kb)
         return PARTNER_MENU
 
@@ -2370,6 +2433,7 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # Академия гомеостаза
     if text == p.get("btn_academy",""):
+        await send_slot_video(context.bot, user.id, "academy")
         await update.message.reply_text(
             ACADEMY_CONTENT.get(lang, ACADEMY_CONTENT["ru"]),
             parse_mode="Markdown",
@@ -2390,6 +2454,7 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             await update.message.reply_text(MKT_ALL_DONE.get(lang,MKT_ALL_DONE["ru"]),reply_markup=kb)
             return PARTNER_MENU
         mkt_kb = ReplyKeyboardMarkup([[MKT_DONE_BTN.get(lang,MKT_DONE_BTN["ru"])],[MKT_REPEAT_BTN.get(lang,MKT_REPEAT_BTN["ru"])],[p["btn_back"]]],resize_keyboard=True)
+        await send_slot_video(context.bot, user.id, f"mkt_day_{day}")
         await update.message.reply_text(MKT_DAYS[day].get(lang,MKT_DAYS[day]["ru"]),parse_mode="Markdown",reply_markup=mkt_kb)
         return PARTNER_MENU
 
@@ -2762,6 +2827,7 @@ async def partner_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Сохраняем в Google Sheets (постоянное хранение)
     await partner_add_sheets(uid, info.get("name",""), info.get("cid",""), lang, uname)
     try:
+        await send_slot_video(context.bot, uid, "partner_ok")
         await context.bot.send_message(
             chat_id=uid, text=p["approved"],
             reply_markup=get_partner_kb(lang)
@@ -2843,9 +2909,9 @@ def schedule_partner_reminders(context, uid: int, lang: str):
 
 ADMIN_KB = ReplyKeyboardMarkup(
     [["👥 Список партнёров",  "📋 Заявки на вебинар"],
-     ["📰 Добавить новость",  "🎥 Отправить кружок"],
-     ["📣 Рассылка партнёрам","📢 Пост всем пользователям"],
-     ["🔙 Выход из админ-меню"]],
+     ["📰 Добавить новость",  "🎬 Управление видео"],
+     ["🎥 Отправить кружок",  "📢 Пост всем пользователям"],
+     ["📣 Рассылка партнёрам","🔙 Выход из админ-меню"]],
     resize_keyboard=True
 )
 
@@ -2917,6 +2983,79 @@ async def admin_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text(chunk, reply_markup=ADMIN_KB)
         else:
             await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=ADMIN_KB)
+        return ADMIN_MENU
+
+    # ── Управление видео ─────────────────────────────────────
+    if text == "🎬 Управление видео":
+        context.user_data["admin_video_menu"] = True
+        context.user_data.pop("admin_video_slot", None)
+        # Показываем список слотов с иконкой наличия видео
+        videos = _jload(_VIDEOS_F)
+        rows = []
+        for slot, label in VIDEO_SLOTS.items():
+            has = "✅" if slot in videos else "⬜"
+            rows.append([f"{has} {label}"])
+        rows.append(["🔙 Назад в меню"])
+        kb = ReplyKeyboardMarkup(rows, resize_keyboard=True)
+        await update.message.reply_text(
+            "🎬 *Управление видео*\n\n"
+            "✅ — видео загружено\n⬜ — видео отсутствует\n\n"
+            "Выберите слот для загрузки или замены видео:",
+            parse_mode="Markdown", reply_markup=kb
+        )
+        return ADMIN_MENU
+
+    # Обработка выбора слота видео
+    if context.user_data.get("admin_video_menu") and not context.user_data.get("admin_video_slot"):
+        if text == "🔙 Назад в меню":
+            context.user_data.pop("admin_video_menu", None)
+            await update.message.reply_text("Вернулись в меню.", reply_markup=ADMIN_KB)
+            return ADMIN_MENU
+        # Ищем выбранный слот
+        chosen_slot = None
+        for slot, label in VIDEO_SLOTS.items():
+            if label in text:
+                chosen_slot = slot
+                break
+        if chosen_slot:
+            context.user_data["admin_video_slot"] = chosen_slot
+            v = video_get(chosen_slot)
+            status = f"Текущее видео: есть (type: {v['type']})" if v else "Видео: отсутствует"
+            kb = ReplyKeyboardMarkup(
+                [["🗑 Удалить видео для этого слота"],
+                 ["🔙 Назад к списку"]],
+                resize_keyboard=True
+            )
+            await update.message.reply_text(
+                f"📍 *{VIDEO_SLOTS[chosen_slot]}*\n\n"
+                f"{status}\n\n"
+                f"Отправьте видео, кружок или GIF — оно привяжется к этому сообщению.\n"
+                f"Или нажмите «🗑 Удалить» чтобы убрать текущее.",
+                parse_mode="Markdown", reply_markup=kb
+            )
+            return ADMIN_MENU
+
+    # Удаление видео для слота
+    if text == "🗑 Удалить видео для этого слота":
+        slot = context.user_data.get("admin_video_slot")
+        if slot:
+            video_delete(slot)
+            context.user_data.pop("admin_video_slot", None)
+            context.user_data.pop("admin_video_menu", None)
+        await update.message.reply_text("✅ Видео удалено.", reply_markup=ADMIN_KB)
+        return ADMIN_MENU
+
+    # Назад к списку слотов
+    if text == "🔙 Назад к списку" and context.user_data.get("admin_video_menu"):
+        context.user_data.pop("admin_video_slot", None)
+        videos = _jload(_VIDEOS_F)
+        rows = []
+        for slot, label in VIDEO_SLOTS.items():
+            has = "✅" if slot in videos else "⬜"
+            rows.append([f"{has} {label}"])
+        rows.append(["🔙 Назад в меню"])
+        kb = ReplyKeyboardMarkup(rows, resize_keyboard=True)
+        await update.message.reply_text("Выберите слот:", reply_markup=kb)
         return ADMIN_MENU
 
     # Новость — сохраняем и сразу отправляем всем партнёрам
@@ -3067,27 +3206,59 @@ async def admin_photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     return ADMIN_MENU
 
 async def admin_circle_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Получаем кружок от admin и рассылаем партнёрам."""
+    """Получаем кружок/видео от admin — либо рассылка, либо привязка к слоту."""
     if update.effective_user.id != MANAGER_CHAT_ID:
         return
-    if not context.user_data.pop("admin_circle", False):
+
+    msg = update.message
+
+    # Определяем тип файла
+    if msg.video_note:
+        file_id = msg.video_note.file_id
+        vtype   = "video_note"
+    elif msg.video:
+        file_id = msg.video.file_id
+        vtype   = "video"
+    elif msg.animation:
+        file_id = msg.animation.file_id
+        vtype   = "animation"
+    else:
         return
-    if not update.message.video_note:
-        await update.message.reply_text("Это не кружок. Попробуйте снова.", reply_markup=ADMIN_KB)
-        return
-    partners = _jload(_PARTNERS_F)
-    sent, failed = 0, 0
-    fid = update.message.video_note.file_id
-    for uid in partners:
-        try:
-            await context.bot.send_video_note(chat_id=int(uid), video_note=fid)
-            sent += 1
-        except Exception:
-            failed += 1
-    await update.message.reply_text(
-        f"✅ Кружок отправлен! Отправлено: {sent} | Ошибок: {failed}",
-        reply_markup=ADMIN_KB
-    )
+
+    # Режим привязки к слоту
+    slot = context.user_data.get("admin_video_slot")
+    if context.user_data.get("admin_video_menu") and slot:
+        video_set(slot, file_id, vtype)
+        context.user_data.pop("admin_video_slot", None)
+        context.user_data.pop("admin_video_menu", None)
+        label = VIDEO_SLOTS.get(slot, slot)
+        await update.message.reply_text(
+            f"✅ Видео сохранено для слота:\n*{label}*\n\n"
+            f"Тип: {vtype}\nFile ID: `{file_id[:30]}...`",
+            parse_mode="Markdown",
+            reply_markup=ADMIN_KB
+        )
+        return ADMIN_MENU
+
+    # Режим рассылки кружка
+    if context.user_data.pop("admin_circle", False):
+        if vtype != "video_note":
+            await update.message.reply_text("Это не кружок. Попробуйте снова.", reply_markup=ADMIN_KB)
+            return ADMIN_MENU
+        partners = _jload(_PARTNERS_F)
+        sent, failed = 0, 0
+        for uid in partners:
+            try:
+                await context.bot.send_video_note(chat_id=int(uid), video_note=file_id)
+                sent += 1
+            except Exception:
+                failed += 1
+        await update.message.reply_text(
+            f"✅ Кружок отправлен! Отправлено: {sent} | Ошибок: {failed}",
+            reply_markup=ADMIN_KB
+        )
+        return ADMIN_MENU
+
     return ADMIN_MENU
 
 # ─── main ─────────────────────────────────────────────────────
@@ -3114,7 +3285,7 @@ def main():
             PARTNER_QUIZ:          [MessageHandler(filters.TEXT & ~filters.COMMAND, partner_quiz_handler)],
             ADMIN_MENU:            [
                 MessageHandler(filters.PHOTO, admin_photo_handler),
-                MessageHandler(filters.VIDEO_NOTE, admin_circle_handler),
+                MessageHandler(filters.VIDEO_NOTE | filters.VIDEO | filters.ANIMATION, admin_circle_handler),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, admin_handler),
             ],
         },
