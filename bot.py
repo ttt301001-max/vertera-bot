@@ -1260,6 +1260,33 @@ async def select_lang(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ref_by = context.user_data.pop("ref_by", None)
     if ref_by and ref_by != user.id:
         ref_add(ref_by, user.id, user.full_name or uname_r, uname_r)
+        # Сохраняем реферала в Google Sheets
+        try:
+            async with httpx.AsyncClient(follow_redirects=True) as _hc:
+                await _hc.post(GOOGLE_SHEET_URL, json={
+                    "type":       "referral",
+                    "inviter_id": str(ref_by),
+                    "user_id":    str(user.id),
+                    "name":       user.full_name or uname_r,
+                    "username":   uname_r,
+                    "lang":       lang,
+                }, timeout=10)
+        except Exception as _e:
+            logger.error(f"referral sheets: {_e}")
+        # Уведомляем партнёра-пригласителя
+        try:
+            inviter_lang = _jload(_PARTNERS_F).get(str(ref_by), {}).get("lang", "ru")
+            notify_msg = {
+                "ru": f"🎉 По вашей реферальной ссылке пришёл новый пользователь!\n\n👤 {user.full_name or uname_r}\n🆔 {uname_r}\n\nОн появился в «👥 Моя команда» 🌿",
+                "tk": f"🎉 Siziň referral salgyňyz arkaly täze ulanyjy geldi!\n\n👤 {user.full_name or uname_r}\n🆔 {uname_r}\n\nOl «👥 Meniň toparymy»-da peýda boldy 🌿",
+                "uz": f"🎉 Sizning referal havolangiz orqali yangi foydalanuvchi keldi!\n\n👤 {user.full_name or uname_r}\n🆔 {uname_r}\n\nU «👥 Mening jamoam»da ko'rindi 🌿",
+            }
+            await context.bot.send_message(
+                chat_id=ref_by,
+                text=notify_msg.get(inviter_lang, notify_msg["ru"])
+            )
+        except Exception as _e:
+            logger.error(f"referral notify: {_e}")
 
     t = TEXTS[lang]
     await send_slot_video(context.bot, user.id, "welcome", lang)
@@ -2621,174 +2648,102 @@ LEARN_FULL = {
 SALES_SCRIPTS = {
     "vertera_gel": {
         "name": {"ru": "🟢 Vertera Gel", "tk": "🟢 Vertera Gel", "uz": "🟢 Vertera Gel"},
-        "text": {
-            "ru": (
-                "Привет! 🌿\n\n"
-                "Хочу поделиться с тобой кое-чем интересным.\n\n"
-                "Я недавно начал(а) пить *Vertera Gel* — натуральный гель из морских водорослей. "
-                "Он помогает с иммунитетом, пищеварением и общим тонусом.\n\n"
-                "140+ полезных веществ, 6 клинических исследований. "
-                "Реально чувствуется разница уже через 2 недели 👌\n\n"
-                "Хочешь узнать подробнее? Могу рассказать как получить со скидкой 30% 🌿"
-            ),
-            "tk": (
-                "Salam! 🌿\n\n"
-                "Saňa gyzykly bir zat hakda aýtmak isleýärin.\n\n"
-                "Men ýakynda *Vertera Gel* içip başladym — deňiz ösümliklerinden tebigy gel. "
-                "Immunitet, iýmit siňdiriş we umumy tonusa kömek edýär.\n\n"
-                "140+ peýdaly madda, 6 kliniki syn. "
-                "2 hepde soň tapawut duýulýar 👌\n\n"
-                "Jikme-jik bilmek isleýärsiňmi? 30% arzanladyş bilen nädip almak bolýandygyny aýdyp bilerin 🌿"
-            ),
-            "uz": (
-                "Salom! 🌿\n\n"
-                "Siz bilan qiziqarli narsa haqida o'rtoqlashmoqchiman.\n\n"
-                "Men yaqinda *Vertera Gel* ichishni boshladim — dengiz o'tlaridan tabiiy gel. "
-                "Immunitet, hazm qilish va umumiy tonusga yordam beradi.\n\n"
-                "140+ foydali modda, 6 ta klinik tadqiqot. "
-                "2 hafta ichida farqni his qilasiz 👌\n\n"
-                "Batafsil bilmoqchimisiz? 30% chegirma bilan qanday olishni aytib bera olaman 🌿"
-            ),
+        "steps": {
+            "ru": [
+                "Привет! Давно не общались 😊\n\nКак ты? Как дела вообще, чем сейчас занимаешься?",
+                "Понял(а)! Кстати, хочу спросить — ты вообще следишь за здоровьем, что-то принимаешь для иммунитета или пищеварения?",
+                "Интересно! Я вот недавно стал(а) пробовать натуральные продукты из морских водорослей — результат реально удивил.\n\nМожет встретимся как-нибудь, расскажу подробнее? Или в удобное время в зуме — буквально 15 минут 🌿",
+            ],
+            "tk": [
+                "Salam! Köp wagt görüşmedik 😊\n\nNähili? Umumy ýagdaý nähili, häzir näme bilen meşgullanýarsyň?",
+                "Düşündim! Aýdyp geçeýin — immunitet ýa-da iýmit siňdiriş üçin saglygyňa üns berýärmiň, bir zat içýärmiňmi?",
+                "Gyzykly! Men ýakynda deňiz ösümliklerinden tebigy önümleri synap başladym — netije hakykatdan haýran galdyrdy.\n\nBelki duşuşarys, jikme-jik gürrüň bereýin? Ýa-da amatly wagtyňda zoomda — bary-ýogy 15 minut 🌿",
+            ],
+            "uz": [
+                "Salom! Ko'p ko'rishmadik 😊\n\nQanday? Umuman ahvol qanday, hozir nima bilan shug'ullanayapsiz?",
+                "Tushundim! Aytib o'tay — sog'lig'ingizga e'tibor berasizmi, immunitet yoki hazm qilish uchun biror narsa ichasizmi?",
+                "Qiziq! Men yaqinda dengiz o'tlaridan tabiiy mahsulotlarni sinab ko'ra boshladim — natija haqiqatan hayratga soldi.\n\nBalki uchrashamiz, batafsil aytib beraman? Yoki qulay vaqtda zoomda — atigi 15 daqiqa 🌿",
+            ],
         }
     },
     "angiolive": {
         "name": {"ru": "💜 AngioLive", "tk": "💜 AngioLive", "uz": "💜 AngioLive"},
-        "text": {
-            "ru": (
-                "Привет! 🌿\n\n"
-                "Знаешь ли ты о *AngioLive*?\n\n"
-                "Это натуральный продукт для здоровья сосудов, сердца и вен. "
-                "Ламинария + экстракт красного винограда — помогает при усталости ног, "
-                "отёках, профилактике варикоза.\n\n"
-                "Клинически доказан. Норма — 90 г в день.\n\n"
-                "Если у тебя или твоих близких есть проблемы с сосудами — "
-                "это стоит попробовать. Расскажу подробнее? 💜"
-            ),
-            "tk": (
-                "Salam! 🌿\n\n"
-                "*AngioLive* barada bilýärsiňmi?\n\n"
-                "Bu damarlar, ýürek we wena saglygy üçin tebigy önüm. "
-                "Laminariýa + gyzyl üzüm ekstrakty — aýak ýadawlygy, "
-                "çişme, warikozy öňüni almaga kömek edýär.\n\n"
-                "Kliniki taýdan subut edildi. Günde 90 g.\n\n"
-                "Sen ýa-da ýakynlaryňda damar meseleleri bar bolsa — "
-                "synap görmek gerek. Jikme-jik aýdaýynmy? 💜"
-            ),
-            "uz": (
-                "Salom! 🌿\n\n"
-                "*AngioLive* haqida bilasizmi?\n\n"
-                "Bu tomir, yurak va venalar salomatligi uchun tabiiy mahsulot. "
-                "Laminaria + qizil uzum ekstrakti — oyoq charchoqligi, "
-                "shishlar, varikoz oldini olishga yordam beradi.\n\n"
-                "Klinik jihatdan isbotlangan. Kuniga 90 g.\n\n"
-                "Siz yoki yaqinlaringizda tomir muammolari bo'lsa — "
-                "sinab ko'rish kerak. Batafsil aytib beraymi? 💜"
-            ),
+        "steps": {
+            "ru": [
+                "Привет! Как ты поживаешь? Что нового, как здоровье? 😊",
+                "Рад(а) слышать! Кстати, а у тебя или близких бывает усталость ног, тяжесть, отёки к вечеру? Просто интересно спросить.",
+                "Понял(а). Слушай, я недавно узнал(а) об одном натуральном продукте именно для здоровья сосудов и вен. Сам(а) пробую — интересный результат.\n\nДавай встретимся или созвонимся, расскажу — займёт минут 15, не больше 💜",
+            ],
+            "tk": [
+                "Salam! Nähili ýagdaý? Näme täzelik, saglyk nähili? 😊",
+                "Şatlandyrdy! Aýdyp geçeýin — sende ýa-da ýakynlaryňda aýaklaryň ýadamagy, agyrlygy, agşamyna çişmegi bolýarmy? Diňe gyzyklandym.",
+                "Düşündim. Diň, ýakynda damarlar we wena saglygy üçin tebigy önüm barada öwrendim. Özüm synap görýärin — gyzykly netije.\n\nGeliň duşuşaly ýa-da jaňlaşaly, 15 minutdan köp almaz 💜",
+            ],
+            "uz": [
+                "Salom! Qanday ahvol? Nima yangilik, sog'lik qanday? 😊",
+                "Quvondim! Aytib o'tay — sizda yoki yaqinlaringizda oyoqlar charchaqligi, og'irlik, kechqurun shishish bo'ladimi? Shunchaki qiziqib so'radim.",
+                "Tushundim. Eshiting, yaqinda tomir va vena salomatligi uchun tabiiy mahsulot haqida bildim. O'zim sinab ko'ryapman — qiziqarli natija.\n\nKelin uchrashamiz yoki qo'ng'iroq qilaylik, 15 daqiqadan ko'p olmaydi 💜",
+            ],
         }
     },
     "collagen": {
         "name": {"ru": "✨ Коллаген + Hydrate", "tk": "✨ Kollagen + Hydrate", "uz": "✨ Kollagen + Hydrate"},
-        "text": {
-            "ru": (
-                "Привет! ✨\n\n"
-                "Хочу рассказать о продукте, который реально меняет кожу.\n\n"
-                "*Hydrate Collagen* — нативный коллаген из кожи пресноводных рыб. "
-                "Не синтетический, а живой — лучше усваивается.\n\n"
-                "• Увлажняет кожу изнутри\n"
-                "• Убирает мелкие морщины\n"
-                "• Укрепляет волосы и ногти\n\n"
-                "Результат заметен уже через 3-4 недели. "
-                "Хочешь попробовать со скидкой 30%? ✨"
-            ),
-            "tk": (
-                "Salam! ✨\n\n"
-                "Derini hakykatdan üýtgedýän önüm hakda aýtmak isleýärin.\n\n"
-                "*Hydrate Collagen* — süýdemsiz balyklaryň derisinden natiw kollagen. "
-                "Sintetiki däl, diri — has gowy siňýär.\n\n"
-                "• Derini içeriden nemledýär\n"
-                "• Inçe gyryşyklary aýyrýar\n"
-                "• Saçlary we dyrnaklary berkidýär\n\n"
-                "Netije 3-4 hepde soň görünýär. "
-                "30% arzanladyş bilen synap görmek isleýärsiňmi? ✨"
-            ),
-            "uz": (
-                "Salom! ✨\n\n"
-                "Terini haqiqatan o'zgartiradigan mahsulot haqida aytmoqchiman.\n\n"
-                "*Hydrate Collagen* — chuchuk baliq terisidan nativ kollagen. "
-                "Sintetik emas, tirik — yaxshiroq o'zlashtiriladi.\n\n"
-                "• Terini ichidan namlantiradi\n"
-                "• Mayda ajinlarni yo'qotadi\n"
-                "• Soch va tirnoqlarni mustahkamlaydi\n\n"
-                "Natija 3-4 hafta ichida ko'rinadi. "
-                "30% chegirma bilan sinab ko'rmoqchimisiz? ✨"
-            ),
+        "steps": {
+            "ru": [
+                "Привет! Как дела? Давно не виделись 😊 Чем занимаешься сейчас?",
+                "Отлично! Кстати, ты сейчас за кожей ухаживаешь? Кремы, маски — что-то используешь? Просто к слову спросил(а).",
+                "Понятно! Я вот недавно начал(а) пробовать натуральный коллаген — честно говоря, не ожидал(а) такого эффекта для кожи и волос.\n\nЕсли хочешь — встретимся или в зум, расскажу подробнее, буквально 10-15 минут ✨",
+            ],
+            "tk": [
+                "Salam! Nähili? Köp wagt görüşmedik 😊 Häzir näme bilen meşgullanýarsyň?",
+                "Ajaýyp! Aýdyp geçeýin, häzir derilere ideg edýärsiňmi? Krem, maska — bir zat ulanýarsyňmy? Diňe gyzyklandym.",
+                "Düşündim! Men ýakynda tebigy kollagen synap başladym — dogrymy aýtsam, deri we saça täsiri haýran galdyrdy.\n\nIsleseň duşuşaly ýa-da zoomda, jikme-jik gürrüň bereýin, bary-ýogy 10-15 minut ✨",
+            ],
+            "uz": [
+                "Salom! Qanday? Ko'p ko'rishmadik 😊 Hozir nima bilan shug'ullanayapsiz?",
+                "Zo'r! Aytib o'tay, hozir teringizga g'amxo'rlik qilayapsizmi? Krem, niqob — biror narsa ishlatasizmi? Shunchaki qiziqib so'radim.",
+                "Tushundim! Men yaqinda tabiiy kollagen sinab ko'ra boshladim — to'g'risini aytsam, teri va sochga ta'siri hayratga soldi.\n\nXohlasangiz uchrashamiz yoki zoomda, batafsil aytib beraman, atigi 10-15 daqiqa ✨",
+            ],
         }
     },
     "business": {
         "name": {"ru": "💼 Бизнес Vertera", "tk": "💼 Vertera biznesi", "uz": "💼 Vertera biznesi"},
-        "text": {
-            "ru": (
-                "Привет! 🌿\n\n"
-                "Ты когда-нибудь думал(а) о дополнительном доходе?\n\n"
-                "Я сотрудничаю с *Vertera* — международной компанией натуральных продуктов. "
-                "Здесь можно зарабатывать, просто рекомендуя то, чем сам пользуешься.\n\n"
-                "💰 Как это работает:\n"
-                "• Попробуй продукт — убедись в результате\n"
-                "• Расскажи знакомым — получай 40% с их покупок\n"
-                "• Строй команду — получай пассивный доход\n\n"
-                "Первый шаг бесплатный. Хочешь узнать подробнее? 🌿"
-            ),
-            "tk": (
-                "Salam! 🌿\n\n"
-                "Goşmaça girdeji hakda pikir edip gördüňmi?\n\n"
-                "Men *Vertera* — halkara tebigy önümler kompaniýasy bilen hyzmatdaşlyk edýärin. "
-                "Bu ýerde özüň ulanýan zady maslahat berip gazanyp bolýar.\n\n"
-                "💰 Bu nähili işleýär:\n"
-                "• Önümi synap gör — netijesine göz ýetir\n"
-                "• Tanşyňa aýt — satyn alyşlaryndan 40% al\n"
-                "• Topar gur — passif girdeji al\n\n"
-                "Ilkinji ädim mugt. Jikme-jik bilmek isleýärsiňmi? 🌿"
-            ),
-            "uz": (
-                "Salom! 🌿\n\n"
-                "Qo'shimcha daromad haqida o'ylab ko'rganmisiz?\n\n"
-                "Men *Vertera* — xalqaro tabiiy mahsulotlar kompaniyasi bilan hamkorlik qilaman. "
-                "Bu yerda o'zing ishlatadiganingni tavsiya qilib pul ishlash mumkin.\n\n"
-                "💰 Bu qanday ishlaydi:\n"
-                "• Mahsulotni sinab ko'r — natijasiga ishonch hosil qil\n"
-                "• Tanishingga ayt — xaridlaridan 40% ol\n"
-                "• Jamoa qur — passiv daromad ol\n\n"
-                "Birinchi qadam bepul. Batafsil bilmoqchimisiz? 🌿"
-            ),
+        "steps": {
+            "ru": [
+                "Привет! Давно не общались 😊 Как ты? Как работа, всё нормально?",
+                "Понял(а)! А скажи — ты сейчас открыт(а) для новых возможностей дохода? Или сейчас не актуально?",
+                "Интересно! Я сам(а) недавно начал(а) сотрудничество с одной международной компанией — натуральные продукты, реально рабочая история.\n\nДавай встретимся или созвонимся минут на 20? Расскажу как это устроено, без давления 🌿",
+            ],
+            "tk": [
+                "Salam! Köp wagt görüşmedik 😊 Nähili? Iş nähili, ähli zat gowy?",
+                "Düşündim! Aýdyp berer, häzir täze girdeji mümkinçiliklerine açykmy? Ýa-da häzir wagt däl mi?",
+                "Gyzykly! Men ýakynda bir halkara kompaniýa bilen hyzmatdaşlyga başladym — tebigy önümler, hakykatdan işleýän zat.\n\nGeliň duşuşaly ýa-da 20 minut jaňlaşaly? Basyş etmezden nähili gurnalandygyny gürrüň bereýin 🌿",
+            ],
+            "uz": [
+                "Salom! Ko'p ko'rishmadik 😊 Qanday? Ish qanday, hammasi normal?",
+                "Tushundim! Ayting — hozir yangi daromad imkoniyatlariga ochmisiz? Yoki hozir aktual emas mi?",
+                "Qiziq! Men o'zim yaqinda xalqaro kompaniya bilan hamkorlik boshladim — tabiiy mahsulotlar, haqiqatan ishlaydigan narsa.\n\nKelin uchrashamiz yoki 20 daqiqa qo'ng'iroq qilaylik? Bosim o'tkazmasdan qanday ishlashini aytib beraman 🌿",
+            ],
         }
     },
     "seahoney": {
         "name": {"ru": "🍯 Sea Honey", "tk": "🍯 Sea Honey", "uz": "🍯 Sea Honey"},
-        "text": {
-            "ru": (
-                "Привет! 🍯\n\n"
-                "Знаешь ли ты про *Sea Honey* от Vertera?\n\n"
-                "Это уникальный продукт — морские водоросли + натуральный мёд + прополис. "
-                "Укрепляет иммунитет, заряжает энергией, поддерживает здоровье.\n\n"
-                "Вкусно и полезно одновременно\n\n"
-                "Хочешь попробовать? Расскажу как получить со скидкой 30%! 🌿"
-            ),
-            "tk": (
-                "Salam! 🍯\n\n"
-                "Verteranyň *Sea Honey*-si barada bilýärsiňmi?\n\n"
-                "Bu özboluşly önüm — deňiz ösümlikleri + tebigy bal + propolis. "
-                "Immuniteti berkidýär, energiýa berýär, saglyk goldaýar.\n\n"
-                "Lezzetli we peýdaly\n\n"
-                "Synap görmek isleýärsiňmi? 30% arzanladyş bilen nädip almak bolýandygyny aýdaýyn! 🌿"
-            ),
-            "uz": (
-                "Salom! 🍯\n\n"
-                "Verteraning *Sea Honey*-sini bilasizmi?\n\n"
-                "Bu noyob mahsulot — dengiz o'tlari + tabiiy asal + propolis. "
-                "Immunitetni mustahkamlaydi, energiya beradi, sog'likni qo'llab-quvvatlaydi.\n\n"
-                "Mazali va foydali bir vaqtda\n\n"
-                "Sinab ko'rmoqchimisiz? 30% chegirma bilan qanday olishni aytib beray! 🌿"
-            ),
+        "steps": {
+            "ru": [
+                "Привет! Как дела? Что нового? 😊",
+                "Рад(а) слышать! Кстати, а ты вообще следишь за тем что ешь, интересуешься здоровым питанием?",
+                "Здорово! Я недавно попробовал(а) один интересный продукт — морские водоросли + мёд + прополис, всё натуральное. Вкусно и результат для иммунитета хороший.\n\nЕсли интересно — давай встретимся или созвонимся, расскажу подробнее, минут 15 максимум 🍯",
+            ],
+            "tk": [
+                "Salam! Nähili? Näme täzelik? 😊",
+                "Şatlandyrdy! Aýdyp geçeýin — sen umumy iýýän zadyňa üns berýärmiň, sagdyn iýmit bilen gyzyklanýarmyň?",
+                "Ajaýyp! Men ýakynda bir gyzykly önüm synap gördüm — deňiz ösümlikleri + bal + propolis, ählisi tebigy. Lezzetli we immunitet üçin gowy netije.\n\nGyzyklanýan bolsaň — geliň duşuşaly ýa-da jaňlaşaly, jikme-jik gürrüň bereýin, iň köp 15 minut 🍯",
+            ],
+            "uz": [
+                "Salom! Qanday? Nima yangilik? 😊",
+                "Quvondim! Aytib o'tay — siz umuman imoningizga e'tibor berasizmi, sog'lom ovqatlanish bilan qiziqasizmi?",
+                "Zo'r! Men yaqinda qiziqarli mahsulot sinab ko'rdim — dengiz o'tlari + asal + propolis, hammasi tabiiy. Mazali va immunitet uchun yaxshi natija.\n\nQiziqsangiz — uchrashamiz yoki qo'ng'iroq qilaylik, batafsil aytib beraman, ko'pi bilan 15 daqiqa 🍯",
+            ],
         }
     },
 }
@@ -3071,33 +3026,41 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     if text in ref_btns:
         link = f"https://t.me/{BOT_USERNAME}?start=ref{user.id}"
         cnt  = ref_count(user.id)
-        msgs = {
+        # Отправляем ссылку как кликабельную inline-кнопку
+        from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+        inline_kb = InlineKeyboardMarkup([[
+            InlineKeyboardButton(
+                text={"ru": "🔗 Открыть ссылку", "tk": "🔗 Salgy açmak", "uz": "🔗 Havolani ochish"}.get(lang, "🔗 Open link"),
+                url=link
+            )
+        ]])
+        hdr = {
             "ru": (
                 "🔗 *Ваша реферальная ссылка:*\n\n"
                 f"`{link}`\n\n"
-                "Отправьте эту ссылку знакомым. Когда они перейдут и зарегистрируются — "
-                "вы увидите их в разделе «👥 Моя команда».\n\n"
+                "Скопируйте эту ссылку и отправьте знакомым.\n"
+                "Когда человек перейдёт по ней и зарегистрируется — он появится в «👥 Моя команда».\n\n"
                 f"👥 Приглашено вами: *{cnt}* чел."
             ),
             "tk": (
                 "🔗 *Siziň referral salgyňyz:*\n\n"
                 f"`{link}`\n\n"
-                "Bu salgy tanşlaryňyza iberiň. Olar geçip hasaba alynanda — "
-                "«👥 Meniň toparymy» bölümde görersiňiz.\n\n"
+                "Bu salgy kopyalaň we tanşlaryňyza iberiň.\n"
+                "Adam geçip hasaba alynanda — «👥 Meniň toparymy»-da peýda bolar.\n\n"
                 f"👥 Siziň çagyryşlaryňyz: *{cnt}* adam"
             ),
             "uz": (
                 "🔗 *Sizning referal havolangiz:*\n\n"
                 f"`{link}`\n\n"
-                "Bu havolani tanishlaringizga yuboring. Ular o'tib ro'yxatdan o'tganda — "
-                "«👥 Mening jamoam» bo'limida ko'rasiz.\n\n"
+                "Bu havolani nusxalab tanishlaringizga yuboring.\n"
+                "Kishi o'tib ro'yxatdan o'tganda — «👥 Mening jamoam»da ko'rinadi.\n\n"
                 f"👥 Siz taklif qilganlar: *{cnt}* kishi"
             ),
         }
         await update.message.reply_text(
-            msgs.get(lang, msgs["ru"]),
+            hdr.get(lang, hdr["ru"]),
             parse_mode="Markdown",
-            reply_markup=get_partner_kb(lang)
+            reply_markup=inline_kb
         )
         return PARTNER_MENU
 
@@ -3200,35 +3163,113 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         return PARTNER_MENU
 
     # ── Скрипты продаж ────────────────────────────────────────
+    # ── Скрипты продаж — 3 шага прогрева ────────────────────
     script_btns = [PT[l].get("btn_scripts","") for l in PT]
-    if text in script_btns or context.user_data.get("in_scripts"):
+    # Кнопка "следующий шаг"
+    next_step_btns = {
+        "ru": "➡️ Следующее сообщение",
+        "tk": "➡️ Indiki habar",
+        "uz": "➡️ Keyingi xabar",
+    }
+    # Кнопка "выбрать другой скрипт"
+    other_script_btns = {
+        "ru": "🔄 Другой продукт",
+        "tk": "🔄 Başga önüm",
+        "uz": "🔄 Boshqa mahsulot",
+    }
+
+    in_scripts = context.user_data.get("in_scripts")
+    in_script_step = context.user_data.get("script_step")  # текущий шаг 0,1,2
+
+    # Кнопка "следующий шаг" во время показа скрипта
+    if in_script_step is not None and text == next_step_btns.get(lang, next_step_btns["ru"]):
+        skey   = context.user_data.get("script_key", "")
+        step   = context.user_data["script_step"]
+        steps  = SALES_SCRIPTS[skey]["steps"].get(lang, SALES_SCRIPTS[skey]["steps"]["ru"])
+        if step < len(steps) - 1:
+            context.user_data["script_step"] = step + 1
+            next_text = steps[step + 1]
+            is_last = (step + 1 == len(steps) - 1)
+            tip = {
+                "ru": "\n\n📋 _Скопируйте и отправьте_",
+                "tk": "\n\n📋 _Kopyalaň we iberiň_",
+                "uz": "\n\n📋 _Nusxalab yuboring_",
+            }
+            rows = []
+            if not is_last:
+                rows.append([next_step_btns.get(lang, next_step_btns["ru"])])
+            rows.append([other_script_btns.get(lang, other_script_btns["ru"])])
+            rows.append([p["btn_back"]])
+            hdr = {
+                "ru": f"💬 *Шаг {step+2}/3:*\n\n",
+                "tk": f"💬 *{step+2}/3 ädim:*\n\n",
+                "uz": f"💬 *{step+2}/3 qadam:*\n\n",
+            }
+            await update.message.reply_text(
+                hdr.get(lang, hdr["ru"]) + next_text + tip.get(lang, ""),
+                parse_mode="Markdown",
+                reply_markup=ReplyKeyboardMarkup(rows, resize_keyboard=True)
+            )
+        return PARTNER_MENU
+
+    # Кнопка "другой продукт" — возврат к списку
+    if in_script_step is not None and text == other_script_btns.get(lang, other_script_btns["ru"]):
+        context.user_data.pop("script_step", None)
+        context.user_data.pop("script_key", None)
         context.user_data["in_scripts"] = True
+
+    if text in script_btns or in_scripts:
+        context.user_data["in_scripts"] = True
+        context.user_data.pop("script_step", None)
+        context.user_data.pop("script_key", None)
+
+        # Проверяем — выбрал ли продукт
         chosen_key = None
         for skey, sdata in SALES_SCRIPTS.items():
             sname = sdata["name"].get(lang, sdata["name"]["ru"])
             if text == sname:
                 chosen_key = skey
                 break
+
         if chosen_key:
-            context.user_data.pop("in_scripts", None)
-            script_text = SALES_SCRIPTS[chosen_key]["text"].get(lang, SALES_SCRIPTS[chosen_key]["text"]["ru"])
-            tip_map = {
-                "ru": "\n\n📋 _Скопируйте и отправьте знакомому_",
-                "tk": "\n\n📋 _Kopyalaň we tanşyňyza iberiň_",
-                "uz": "\n\n📋 _Nusxalab tanishingizga yuboring_",
+            # Показываем шаг 1 из 3
+            context.user_data["in_scripts"]  = False
+            context.user_data["script_key"]  = chosen_key
+            context.user_data["script_step"] = 0
+            steps = SALES_SCRIPTS[chosen_key]["steps"].get(lang, SALES_SCRIPTS[chosen_key]["steps"]["ru"])
+            tip = {
+                "ru": "\n\n📋 _Скопируйте и отправьте_",
+                "tk": "\n\n📋 _Kopyalaň we iberiň_",
+                "uz": "\n\n📋 _Nusxalab yuboring_",
             }
+            hdr = {
+                "ru": "💬 *Шаг 1/3 — Первый контакт:*\n\n",
+                "tk": "💬 *1/3 ädim — Ilkinji habarlaşma:*\n\n",
+                "uz": "💬 *1/3 qadam — Birinchi muloqot:*\n\n",
+            }
+            desc = {
+                "ru": "📎 *Скрипт прогрева — 3 шага*\n\nСначала спросите как дела → узнайте интерес → пригласите на встречу.\nОтправляйте по одному, ждите ответа между шагами.\n\n",
+                "tk": "📎 *Gyzdyrma skripti — 3 ädim*\n\nÖňürti ýagdaýy soraň → gyzyklanma öwreniň → duşuşyga çagyryň.\nBiri-birinden soň iberiň, jogap garaşyň.\n\n",
+                "uz": "📎 *Isitish skripti — 3 qadam*\n\nAvval ahvol so'rang → qiziqishni biling → uchrashuvga taklif qiling.\nBirin-ketin yuboring, javob kutib.\n\n",
+            }
+            rows = [
+                [next_step_btns.get(lang, next_step_btns["ru"])],
+                [other_script_btns.get(lang, other_script_btns["ru"])],
+                [p["btn_back"]],
+            ]
             await update.message.reply_text(
-                script_text + tip_map.get(lang, ""),
+                desc.get(lang, desc["ru"]) + hdr.get(lang, hdr["ru"]) + steps[0] + tip.get(lang, ""),
                 parse_mode="Markdown",
-                reply_markup=get_partner_kb(lang)
+                reply_markup=ReplyKeyboardMarkup(rows, resize_keyboard=True)
             )
         else:
+            # Показываем список продуктов
             rows = [[sdata["name"].get(lang, sdata["name"]["ru"])] for sdata in SALES_SCRIPTS.values()]
             rows.append([p["btn_back"]])
             hdr_map = {
-                "ru": "📎 *Скрипты продаж*\n\nВыберите продукт — получите готовый текст для отправки клиенту:",
-                "tk": "📎 *Satuw skriptleri*\n\nÖnüm saýlaň — müşderä ibermek üçin taýyn tekst alyň:",
-                "uz": "📎 *Sotuv skriptlari*\n\nMahsulot tanlang — mijozga yuborish uchun tayyor matn oling:",
+                "ru": "📎 *Скрипты продаж*\n\nКаждый скрипт — 3 шага прогрева:\n1️⃣ Спросить как дела\n2️⃣ Узнать интерес\n3️⃣ Пригласить на встречу\n\nВыберите продукт:",
+                "tk": "📎 *Satuw skriptleri*\n\nHer skript — 3 ädim:\n1️⃣ Ýagdaýy soramak\n2️⃣ Gyzyklanma öwrenmek\n3️⃣ Duşuşyga çagyrmak\n\nÖnüm saýlaň:",
+                "uz": "📎 *Sotuv skriptlari*\n\nHar skript — 3 qadam:\n1️⃣ Ahvol so'rash\n2️⃣ Qiziqishni bilish\n3️⃣ Uchrashuvga taklif\n\nMahsulot tanlang:",
             }
             await update.message.reply_text(
                 hdr_map.get(lang, hdr_map["ru"]),
