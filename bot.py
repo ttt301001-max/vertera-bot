@@ -1,7 +1,7 @@
 import os
 import logging
 import httpx
-from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
     filters, ContextTypes, ConversationHandler
@@ -424,9 +424,15 @@ def schedule_triggers(context, uid: int, lang: str, kind: str):
         if old:
             try: old.cancel()
             except Exception: pass
-        task = asyncio.ensure_future(
-            _run_trigger_job(context.bot, uid, key, seconds)
-        )
+        try:
+            loop = asyncio.get_event_loop()
+            task = loop.create_task(
+                _run_trigger_job(context.bot, uid, key, seconds)
+            )
+        except RuntimeError:
+            task = asyncio.ensure_future(
+                _run_trigger_job(context.bot, uid, key, seconds)
+            )
         context.user_data[task_key] = task
         logger.info(f"⏱ Trigger {key} scheduled for uid={uid} in {seconds}s")
 
@@ -3027,7 +3033,6 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         link = f"https://t.me/{BOT_USERNAME}?start=ref{user.id}"
         cnt  = ref_count(user.id)
         # Отправляем ссылку как кликабельную inline-кнопку
-        from telegram import InlineKeyboardMarkup, InlineKeyboardButton
         inline_kb = InlineKeyboardMarkup([[
             InlineKeyboardButton(
                 text={"ru": "🔗 Открыть ссылку", "tk": "🔗 Salgy açmak", "uz": "🔗 Havolani ochish"}.get(lang, "🔗 Open link"),
@@ -3571,6 +3576,9 @@ async def send_partner_reminder(context) -> None:
 
 def schedule_partner_reminders(context, uid: int, lang: str):
     """Планирует серию напоминаний после одобрения партнёра."""
+    if not context.job_queue:
+        logger.warning("job_queue not available — install apscheduler")
+        return
     base = f"prem_{uid}"
     # Через 1 день — обзвонил ли контакты?
     context.job_queue.run_once(
@@ -4331,7 +4339,7 @@ async def admin_circle_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
 # ─── main ─────────────────────────────────────────────────────
 def main():
-    app = Application.builder().token(BOT_TOKEN).post_init(_load_partners_impl).build()
+    app = Application.builder().token(BOT_TOKEN).post_init(_load_partners_impl).job_queue(True).build()
 
     conv = ConversationHandler(
         entry_points=[
