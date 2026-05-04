@@ -4339,7 +4339,7 @@ async def admin_circle_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
 # ─── main ─────────────────────────────────────────────────────
 def main():
-    app = Application.builder().token(BOT_TOKEN).post_init(_load_partners_impl).job_queue(True).build()
+    app = Application.builder().token(BOT_TOKEN).post_init(_load_partners_impl).build()
 
     conv = ConversationHandler(
         entry_points=[
