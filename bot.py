@@ -26,6 +26,8 @@ logger = logging.getLogger(__name__)
 
 # ─── Состояния ───────────────────────────────────────────────
 SELECT_COUNTRY, SELECT_LANG, CHAT, ANKETA_NAME, ANKETA_PHONE, ANKETA_CITY, ANKETA_INTEREST, PARTNER_ID, PARTNER_MENU, PARTNER_CONTACTS_NAME, PARTNER_CONTACTS_PHONE, ADMIN_MENU, PARTNER_QUIZ = range(13)
+# Имя бота для реферальных ссылок
+BOT_USERNAME = "Verteratkmbot"
 
 user_histories = {}
 
@@ -44,6 +46,7 @@ _VIDEOS_F    = pathlib.Path("/tmp/vrt_videos.json")
 _MKTPROG_F   = pathlib.Path("/tmp/vrt_mkt_progress.json")
 _QUIZ_F      = pathlib.Path("/tmp/vrt_quiz.json")
 _USERS_F     = pathlib.Path("/tmp/vrt_users.json")
+_REFERRALS_F = pathlib.Path("/tmp/vrt_referrals.json")
 
 def _jload(p):
     try:
@@ -481,6 +484,25 @@ async def videos_load_from_sheets():
     except Exception as e:
         logger.error(f"videos_load_from_sheets: {e}")
 
+
+# ─── Рефералы ─────────────────────────────────────────────────
+def ref_add(inviter_uid: int, new_uid: int, new_name: str, new_uname: str):
+    """Записывает нового пользователя как реферала inviter_uid."""
+    d = _jload(_REFERRALS_F)
+    key = str(inviter_uid)
+    lst = d.get(key, [])
+    if not any(str(r.get("uid")) == str(new_uid) for r in lst):
+        lst.append({"uid": str(new_uid), "name": new_name, "uname": new_uname})
+        d[key] = lst
+        _jsave(_REFERRALS_F, d)
+
+def ref_get(inviter_uid: int) -> list:
+    """Возвращает список рефералов партнёра."""
+    return _jload(_REFERRALS_F).get(str(inviter_uid), [])
+
+def ref_count(inviter_uid: int) -> int:
+    return len(ref_get(inviter_uid))
+
 async def progress_sync_to_sheets(uid: int, day: int, name: str, uname: str):
     """Сохраняет прогресс в Google Sheets."""
     try:
@@ -573,6 +595,10 @@ PT = {
         "btn_review_learn": "📖 Просмотреть обучение",
         "btn_review_mkt":   "📖 Просмотреть маркетинг",
         "btn_back":     "🔙 Выйти из меню партнёра",
+        "btn_reflink":  "🔗 Моя реферальная ссылка",
+        "btn_team":     "👥 Моя команда",
+        "btn_achieve":  "🏆 Мои достижения",
+        "btn_scripts":  "📎 Скрипты продаж",
         "calc_ask":     "Введите количество активных партнёров в вашей команде (число):",
         "c_empty":      "👥 Контактов пока нет. Добавьте первого!",
         "c_add":        "➕ Добавить контакт",
@@ -630,6 +656,10 @@ PT = {
         "btn_review_learn": "📖 Okuwы syn etmek",
         "btn_review_mkt":   "📖 Marketingi syn etmek",
         "btn_back":     "🔙 Hyzmatdaş menýusyndan çyk",
+        "btn_reflink":  "🔗 Meniň referral salgymy",
+        "btn_team":     "👥 Meniň toparymy",
+        "btn_achieve":  "🏆 Meniň üstünliklerim",
+        "btn_scripts":  "📎 Satuw skriptleri",
         "calc_ask":     "Toparyňyzdaky işjeň hyzmatdaşlaryň sanyny giriziň (san):",
         "c_empty":      "👥 Heniz kontakt ýok. Birinjisini goşuň!",
         "c_add":        "➕ Kontakt goş",
@@ -687,6 +717,10 @@ PT = {
         "btn_review_learn": "📖 O'qitishni ko'rish",
         "btn_review_mkt":   "📖 Marketingni ko'rish",
         "btn_back":     "🔙 Hamkorlik menyusidan chiqish",
+        "btn_reflink":  "🔗 Mening referal havolam",
+        "btn_team":     "👥 Mening jamoam",
+        "btn_achieve":  "🏆 Mening yutuqlarim",
+        "btn_scripts":  "📎 Sotuv skriptlari",
         "calc_ask":     "Jamoangizdagi faol hamkorlar sonini kiriting (raqam):",
         "c_empty":      "👥 Hali kontakt yo'q. Birinchisini qo'shing!",
         "c_add":        "➕ Kontakt qo'shish",
@@ -727,6 +761,8 @@ def get_partner_kb(lang):
         [[p["btn_learn"],    p["btn_market"]],
          [p["btn_academy"],  p["btn_quiz"]],
          [p["btn_contacts"], p["btn_webinar"]],
+         [p["btn_reflink"],  p["btn_team"]],
+         [p["btn_achieve"],  p["btn_scripts"]],
          [p["btn_news"],     p["btn_back"]]],
         resize_keyboard=True
     )
@@ -1158,6 +1194,17 @@ async def _load_partners_impl(app=None):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
+    # Обрабатываем реферальный параметр: /start ref123456789
+    args = context.args
+    if args:
+        arg = args[0]
+        if arg.startswith("ref"):
+            try:
+                inviter_uid = int(arg[3:])
+                context.user_data["ref_by"] = inviter_uid
+                logger.info(f"Referral: {update.effective_user.id} invited by {inviter_uid}")
+            except ValueError:
+                pass
     await update.message.reply_text(
         "🌍 Выберите вашу страну / Choose your country:\n\nТуркменистан 🇹🇲 / O'zbekiston 🇺🇿",
         reply_markup=ReplyKeyboardMarkup(
@@ -1209,6 +1256,10 @@ async def select_lang(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uname_r = f"@{user.username}" if user.username else str(user.id)
     user_register(user.id, lang, country, user.full_name or uname_r, uname_r)
     await user_register_sheets(user.id, lang, country, user.full_name or uname_r, uname_r)
+    # Записываем реферала если пришёл по ссылке партнёра
+    ref_by = context.user_data.pop("ref_by", None)
+    if ref_by and ref_by != user.id:
+        ref_add(ref_by, user.id, user.full_name or uname_r, uname_r)
 
     t = TEXTS[lang]
     await send_slot_video(context.bot, user.id, "welcome", lang)
@@ -2563,6 +2614,187 @@ LEARN_FULL = {
     ),
 }
 
+
+# ══════════════════════════════════════════════════════════════
+# СКРИПТЫ ПРОДАЖ
+# ══════════════════════════════════════════════════════════════
+SALES_SCRIPTS = {
+    "vertera_gel": {
+        "name": {"ru": "🟢 Vertera Gel", "tk": "🟢 Vertera Gel", "uz": "🟢 Vertera Gel"},
+        "text": {
+            "ru": (
+                "Привет! 🌿\n\n"
+                "Хочу поделиться с тобой кое-чем интересным.\n\n"
+                "Я недавно начал(а) пить *Vertera Gel* — натуральный гель из морских водорослей. "
+                "Он помогает с иммунитетом, пищеварением и общим тонусом.\n\n"
+                "140+ полезных веществ, 6 клинических исследований. "
+                "Реально чувствуется разница уже через 2 недели 👌\n\n"
+                "Хочешь узнать подробнее? Могу рассказать как получить со скидкой 30% 🌿"
+            ),
+            "tk": (
+                "Salam! 🌿\n\n"
+                "Saňa gyzykly bir zat hakda aýtmak isleýärin.\n\n"
+                "Men ýakynda *Vertera Gel* içip başladym — deňiz ösümliklerinden tebigy gel. "
+                "Immunitet, iýmit siňdiriş we umumy tonusa kömek edýär.\n\n"
+                "140+ peýdaly madda, 6 kliniki syn. "
+                "2 hepde soň tapawut duýulýar 👌\n\n"
+                "Jikme-jik bilmek isleýärsiňmi? 30% arzanladyş bilen nädip almak bolýandygyny aýdyp bilerin 🌿"
+            ),
+            "uz": (
+                "Salom! 🌿\n\n"
+                "Siz bilan qiziqarli narsa haqida o'rtoqlashmoqchiman.\n\n"
+                "Men yaqinda *Vertera Gel* ichishni boshladim — dengiz o'tlaridan tabiiy gel. "
+                "Immunitet, hazm qilish va umumiy tonusga yordam beradi.\n\n"
+                "140+ foydali modda, 6 ta klinik tadqiqot. "
+                "2 hafta ichida farqni his qilasiz 👌\n\n"
+                "Batafsil bilmoqchimisiz? 30% chegirma bilan qanday olishni aytib bera olaman 🌿"
+            ),
+        }
+    },
+    "angiolive": {
+        "name": {"ru": "💜 AngioLive", "tk": "💜 AngioLive", "uz": "💜 AngioLive"},
+        "text": {
+            "ru": (
+                "Привет! 🌿\n\n"
+                "Знаешь ли ты о *AngioLive*?\n\n"
+                "Это натуральный продукт для здоровья сосудов, сердца и вен. "
+                "Ламинария + экстракт красного винограда — помогает при усталости ног, "
+                "отёках, профилактике варикоза.\n\n"
+                "Клинически доказан. Норма — 90 г в день.\n\n"
+                "Если у тебя или твоих близких есть проблемы с сосудами — "
+                "это стоит попробовать. Расскажу подробнее? 💜"
+            ),
+            "tk": (
+                "Salam! 🌿\n\n"
+                "*AngioLive* barada bilýärsiňmi?\n\n"
+                "Bu damarlar, ýürek we wena saglygy üçin tebigy önüm. "
+                "Laminariýa + gyzyl üzüm ekstrakty — aýak ýadawlygy, "
+                "çişme, warikozy öňüni almaga kömek edýär.\n\n"
+                "Kliniki taýdan subut edildi. Günde 90 g.\n\n"
+                "Sen ýa-da ýakynlaryňda damar meseleleri bar bolsa — "
+                "synap görmek gerek. Jikme-jik aýdaýynmy? 💜"
+            ),
+            "uz": (
+                "Salom! 🌿\n\n"
+                "*AngioLive* haqida bilasizmi?\n\n"
+                "Bu tomir, yurak va venalar salomatligi uchun tabiiy mahsulot. "
+                "Laminaria + qizil uzum ekstrakti — oyoq charchoqligi, "
+                "shishlar, varikoz oldini olishga yordam beradi.\n\n"
+                "Klinik jihatdan isbotlangan. Kuniga 90 g.\n\n"
+                "Siz yoki yaqinlaringizda tomir muammolari bo'lsa — "
+                "sinab ko'rish kerak. Batafsil aytib beraymi? 💜"
+            ),
+        }
+    },
+    "collagen": {
+        "name": {"ru": "✨ Коллаген + Hydrate", "tk": "✨ Kollagen + Hydrate", "uz": "✨ Kollagen + Hydrate"},
+        "text": {
+            "ru": (
+                "Привет! ✨\n\n"
+                "Хочу рассказать о продукте, который реально меняет кожу.\n\n"
+                "*Hydrate Collagen* — нативный коллаген из кожи пресноводных рыб. "
+                "Не синтетический, а живой — лучше усваивается.\n\n"
+                "• Увлажняет кожу изнутри\n"
+                "• Убирает мелкие морщины\n"
+                "• Укрепляет волосы и ногти\n\n"
+                "Результат заметен уже через 3-4 недели. "
+                "Хочешь попробовать со скидкой 30%? ✨"
+            ),
+            "tk": (
+                "Salam! ✨\n\n"
+                "Derini hakykatdan üýtgedýän önüm hakda aýtmak isleýärin.\n\n"
+                "*Hydrate Collagen* — süýdemsiz balyklaryň derisinden natiw kollagen. "
+                "Sintetiki däl, diri — has gowy siňýär.\n\n"
+                "• Derini içeriden nemledýär\n"
+                "• Inçe gyryşyklary aýyrýar\n"
+                "• Saçlary we dyrnaklary berkidýär\n\n"
+                "Netije 3-4 hepde soň görünýär. "
+                "30% arzanladyş bilen synap görmek isleýärsiňmi? ✨"
+            ),
+            "uz": (
+                "Salom! ✨\n\n"
+                "Terini haqiqatan o'zgartiradigan mahsulot haqida aytmoqchiman.\n\n"
+                "*Hydrate Collagen* — chuchuk baliq terisidan nativ kollagen. "
+                "Sintetik emas, tirik — yaxshiroq o'zlashtiriladi.\n\n"
+                "• Terini ichidan namlantiradi\n"
+                "• Mayda ajinlarni yo'qotadi\n"
+                "• Soch va tirnoqlarni mustahkamlaydi\n\n"
+                "Natija 3-4 hafta ichida ko'rinadi. "
+                "30% chegirma bilan sinab ko'rmoqchimisiz? ✨"
+            ),
+        }
+    },
+    "business": {
+        "name": {"ru": "💼 Бизнес Vertera", "tk": "💼 Vertera biznesi", "uz": "💼 Vertera biznesi"},
+        "text": {
+            "ru": (
+                "Привет! 🌿\n\n"
+                "Ты когда-нибудь думал(а) о дополнительном доходе?\n\n"
+                "Я сотрудничаю с *Vertera* — международной компанией натуральных продуктов. "
+                "Здесь можно зарабатывать, просто рекомендуя то, чем сам пользуешься.\n\n"
+                "💰 Как это работает:\n"
+                "• Попробуй продукт — убедись в результате\n"
+                "• Расскажи знакомым — получай 40% с их покупок\n"
+                "• Строй команду — получай пассивный доход\n\n"
+                "Первый шаг бесплатный. Хочешь узнать подробнее? 🌿"
+            ),
+            "tk": (
+                "Salam! 🌿\n\n"
+                "Goşmaça girdeji hakda pikir edip gördüňmi?\n\n"
+                "Men *Vertera* — halkara tebigy önümler kompaniýasy bilen hyzmatdaşlyk edýärin. "
+                "Bu ýerde özüň ulanýan zady maslahat berip gazanyp bolýar.\n\n"
+                "💰 Bu nähili işleýär:\n"
+                "• Önümi synap gör — netijesine göz ýetir\n"
+                "• Tanşyňa aýt — satyn alyşlaryndan 40% al\n"
+                "• Topar gur — passif girdeji al\n\n"
+                "Ilkinji ädim mugt. Jikme-jik bilmek isleýärsiňmi? 🌿"
+            ),
+            "uz": (
+                "Salom! 🌿\n\n"
+                "Qo'shimcha daromad haqida o'ylab ko'rganmisiz?\n\n"
+                "Men *Vertera* — xalqaro tabiiy mahsulotlar kompaniyasi bilan hamkorlik qilaman. "
+                "Bu yerda o'zing ishlatadiganingni tavsiya qilib pul ishlash mumkin.\n\n"
+                "💰 Bu qanday ishlaydi:\n"
+                "• Mahsulotni sinab ko'r — natijasiga ishonch hosil qil\n"
+                "• Tanishingga ayt — xaridlaridan 40% ol\n"
+                "• Jamoa qur — passiv daromad ol\n\n"
+                "Birinchi qadam bepul. Batafsil bilmoqchimisiz? 🌿"
+            ),
+        }
+    },
+    "seahoney": {
+        "name": {"ru": "🍯 Sea Honey", "tk": "🍯 Sea Honey", "uz": "🍯 Sea Honey"},
+        "text": {
+            "ru": (
+                "Привет! 🍯\n\n"
+                "Знаешь ли ты про *Sea Honey* от Vertera?\n\n"
+                "Это уникальный продукт — морские водоросли + натуральный мёд + прополис. "
+                "Укрепляет иммунитет, заряжает энергией, поддерживает здоровье.\n\n"
+                "Вкусно и полезно одновременно\n\n"
+                "Хочешь попробовать? Расскажу как получить со скидкой 30%! 🌿"
+            ),
+            "tk": (
+                "Salam! 🍯\n\n"
+                "Verteranyň *Sea Honey*-si barada bilýärsiňmi?\n\n"
+                "Bu özboluşly önüm — deňiz ösümlikleri + tebigy bal + propolis. "
+                "Immuniteti berkidýär, energiýa berýär, saglyk goldaýar.\n\n"
+                "Lezzetli we peýdaly\n\n"
+                "Synap görmek isleýärsiňmi? 30% arzanladyş bilen nädip almak bolýandygyny aýdaýyn! 🌿"
+            ),
+            "uz": (
+                "Salom! 🍯\n\n"
+                "Verteraning *Sea Honey*-sini bilasizmi?\n\n"
+                "Bu noyob mahsulot — dengiz o'tlari + tabiiy asal + propolis. "
+                "Immunitetni mustahkamlaydi, energiya beradi, sog'likni qo'llab-quvvatlaydi.\n\n"
+                "Mazali va foydali bir vaqtda\n\n"
+                "Sinab ko'rmoqchimisiz? 30% chegirma bilan qanday olishni aytib beray! 🌿"
+            ),
+        }
+    },
+}
+# Ключи скриптов для выбора
+SCRIPT_KEYS = list(SALES_SCRIPTS.keys())
+
 async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка кнопок внутри партнёрского меню."""
     lang = context.user_data.get("lang", "ru")
@@ -2832,6 +3064,178 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
                 return await _quiz_send_question(update, context, lang)
         if text == p["btn_back"]:
             context.user_data.pop("in_quiz_menu",None)
+
+
+    # ── Реферальная ссылка ────────────────────────────────────
+    ref_btns = [PT[l].get("btn_reflink","") for l in PT]
+    if text in ref_btns:
+        link = f"https://t.me/{BOT_USERNAME}?start=ref{user.id}"
+        cnt  = ref_count(user.id)
+        msgs = {
+            "ru": (
+                "🔗 *Ваша реферальная ссылка:*\n\n"
+                f"`{link}`\n\n"
+                "Отправьте эту ссылку знакомым. Когда они перейдут и зарегистрируются — "
+                "вы увидите их в разделе «👥 Моя команда».\n\n"
+                f"👥 Приглашено вами: *{cnt}* чел."
+            ),
+            "tk": (
+                "🔗 *Siziň referral salgyňyz:*\n\n"
+                f"`{link}`\n\n"
+                "Bu salgy tanşlaryňyza iberiň. Olar geçip hasaba alynanda — "
+                "«👥 Meniň toparymy» bölümde görersiňiz.\n\n"
+                f"👥 Siziň çagyryşlaryňyz: *{cnt}* adam"
+            ),
+            "uz": (
+                "🔗 *Sizning referal havolangiz:*\n\n"
+                f"`{link}`\n\n"
+                "Bu havolani tanishlaringizga yuboring. Ular o'tib ro'yxatdan o'tganda — "
+                "«👥 Mening jamoam» bo'limida ko'rasiz.\n\n"
+                f"👥 Siz taklif qilganlar: *{cnt}* kishi"
+            ),
+        }
+        await update.message.reply_text(
+            msgs.get(lang, msgs["ru"]),
+            parse_mode="Markdown",
+            reply_markup=get_partner_kb(lang)
+        )
+        return PARTNER_MENU
+
+    # ── Моя команда ───────────────────────────────────────────
+    team_btns = [PT[l].get("btn_team","") for l in PT]
+    if text in team_btns:
+        refs = ref_get(user.id)
+        if not refs:
+            no_team = {
+                "ru": "👥 *Моя команда*\n\nПока никого нет.\n\nПоделитесь реферальной ссылкой — нажмите «🔗 Моя реферальная ссылка» 🌿",
+                "tk": "👥 *Meniň toparymy*\n\nHäzirlikçe hiç kim ýok.\n\nReferral salgyňyzy paýlaşyň — «🔗 Meniň referral salgymy» basyň 🌿",
+                "uz": "👥 *Mening jamoam*\n\nHali hech kim yo'q.\n\nReferal havolangizni ulashing — «🔗 Mening referal havolam» bosing 🌿",
+            }
+            await update.message.reply_text(
+                no_team.get(lang, no_team["ru"]),
+                parse_mode="Markdown",
+                reply_markup=get_partner_kb(lang)
+            )
+        else:
+            lines = []
+            for i, r in enumerate(refs, 1):
+                uid_r   = r.get("uid", "")
+                name_r  = r.get("name", "—")
+                learn_day = progress_get(int(uid_r)) if uid_r else 0
+                partner_mark = "🤝" if (uid_r and is_partner(int(uid_r))) else "👤"
+                learn_map = {
+                    "ru": f"📚 день {learn_day}/7" if learn_day else "📚 не начал",
+                    "tk": f"📚 {learn_day}/7 gün" if learn_day else "📚 başlamady",
+                    "uz": f"📚 {learn_day}/7 kun" if learn_day else "📚 boshlamagan",
+                }
+                learn_str = learn_map.get(lang, f"📚 {learn_day}/7")
+                lines.append(f"{i}. {partner_mark} {name_r} | {learn_str}")
+            hdr_map = {
+                "ru": f"👥 *Моя команда* — {len(refs)} чел.\n\n",
+                "tk": f"👥 *Meniň toparymy* — {len(refs)} adam\n\n",
+                "uz": f"👥 *Mening jamoam* — {len(refs)} kishi\n\n",
+            }
+            tip_map = {
+                "ru": "\n\n🤝 — партнёр | 👤 — пользователь",
+                "tk": "\n\n🤝 — hyzmatdaş | 👤 — ulanyjy",
+                "uz": "\n\n🤝 — hamkor | 👤 — foydalanuvchi",
+            }
+            msg = hdr_map.get(lang, hdr_map["ru"]) + "\n".join(lines) + tip_map.get(lang, tip_map["ru"])
+            await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=get_partner_kb(lang))
+        return PARTNER_MENU
+
+    # ── Мои достижения ────────────────────────────────────────
+    achieve_btns = [PT[l].get("btn_achieve","") for l in PT]
+    if text in achieve_btns:
+        learn_day = progress_get(user.id)
+        mkt_day   = mkt_progress_get(user.id)
+        quizzes   = quiz_get(user.id)
+        refs_cnt  = ref_count(user.id)
+        partner   = is_partner(user.id)
+        def badge(ok): return "✅" if ok else "⬜"
+        lines_map = {
+            "ru": [
+                f"{badge(partner)} Стал партнёром Vertera",
+                f"{badge(learn_day >= 7)} Завершил обучение (7 дней)",
+                f"{badge(mkt_day >= 7)} Завершил маркетинг-план (7 дней)",
+                f"{badge(len(quizzes) >= 3)} Прошёл все 3 теста",
+                f"{badge(refs_cnt >= 1)} Пригласил 1 человека",
+                f"{badge(refs_cnt >= 3)} Пригласил 3 человека",
+                f"{badge(refs_cnt >= 5)} Пригласил 5 человек",
+                f"{badge(refs_cnt >= 10)} Пригласил 10 человек 🔥",
+            ],
+            "tk": [
+                f"{badge(partner)} Vertera hyzmatdaşy boldy",
+                f"{badge(learn_day >= 7)} Okuwy tamamlady (7 gün)",
+                f"{badge(mkt_day >= 7)} Marketing meýilnamasyny tamamlady",
+                f"{badge(len(quizzes) >= 3)} Ähli 3 testi geçdi",
+                f"{badge(refs_cnt >= 1)} 1 adam çagyrdy",
+                f"{badge(refs_cnt >= 3)} 3 adam çagyrdy",
+                f"{badge(refs_cnt >= 5)} 5 adam çagyrdy",
+                f"{badge(refs_cnt >= 10)} 10 adam çagyrdy 🔥",
+            ],
+            "uz": [
+                f"{badge(partner)} Vertera hamkori bo'ldi",
+                f"{badge(learn_day >= 7)} O'qitishni tugatdi (7 kun)",
+                f"{badge(mkt_day >= 7)} Marketing rejasini tugatdi",
+                f"{badge(len(quizzes) >= 3)} Barcha 3 testdan o'tdi",
+                f"{badge(refs_cnt >= 1)} 1 kishi taklif qildi",
+                f"{badge(refs_cnt >= 3)} 3 kishi taklif qildi",
+                f"{badge(refs_cnt >= 5)} 5 kishi taklif qildi",
+                f"{badge(refs_cnt >= 10)} 10 kishi taklif qildi 🔥",
+            ],
+        }
+        lines = lines_map.get(lang, lines_map["ru"])
+        done = sum(1 for l in lines if l.startswith("✅"))
+        hdr_map = {
+            "ru": f"🏆 *Мои достижения* ({done}/{len(lines)})\n\n",
+            "tk": f"🏆 *Meniň üstünliklerim* ({done}/{len(lines)})\n\n",
+            "uz": f"🏆 *Mening yutuqlarim* ({done}/{len(lines)})\n\n",
+        }
+        await update.message.reply_text(
+            hdr_map.get(lang, hdr_map["ru"]) + "\n".join(lines),
+            parse_mode="Markdown",
+            reply_markup=get_partner_kb(lang)
+        )
+        return PARTNER_MENU
+
+    # ── Скрипты продаж ────────────────────────────────────────
+    script_btns = [PT[l].get("btn_scripts","") for l in PT]
+    if text in script_btns or context.user_data.get("in_scripts"):
+        context.user_data["in_scripts"] = True
+        chosen_key = None
+        for skey, sdata in SALES_SCRIPTS.items():
+            sname = sdata["name"].get(lang, sdata["name"]["ru"])
+            if text == sname:
+                chosen_key = skey
+                break
+        if chosen_key:
+            context.user_data.pop("in_scripts", None)
+            script_text = SALES_SCRIPTS[chosen_key]["text"].get(lang, SALES_SCRIPTS[chosen_key]["text"]["ru"])
+            tip_map = {
+                "ru": "\n\n📋 _Скопируйте и отправьте знакомому_",
+                "tk": "\n\n📋 _Kopyalaň we tanşyňyza iberiň_",
+                "uz": "\n\n📋 _Nusxalab tanishingizga yuboring_",
+            }
+            await update.message.reply_text(
+                script_text + tip_map.get(lang, ""),
+                parse_mode="Markdown",
+                reply_markup=get_partner_kb(lang)
+            )
+        else:
+            rows = [[sdata["name"].get(lang, sdata["name"]["ru"])] for sdata in SALES_SCRIPTS.values()]
+            rows.append([p["btn_back"]])
+            hdr_map = {
+                "ru": "📎 *Скрипты продаж*\n\nВыберите продукт — получите готовый текст для отправки клиенту:",
+                "tk": "📎 *Satuw skriptleri*\n\nÖnüm saýlaň — müşderä ibermek üçin taýyn tekst alyň:",
+                "uz": "📎 *Sotuv skriptlari*\n\nMahsulot tanlang — mijozga yuborish uchun tayyor matn oling:",
+            }
+            await update.message.reply_text(
+                hdr_map.get(lang, hdr_map["ru"]),
+                parse_mode="Markdown",
+                reply_markup=ReplyKeyboardMarkup(rows, resize_keyboard=True)
+            )
+        return PARTNER_MENU
 
     # Вебинар — записаться
     if text == p.get("btn_webinar", ""):
