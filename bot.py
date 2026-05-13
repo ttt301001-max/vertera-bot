@@ -25,7 +25,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ─── Состояния ───────────────────────────────────────────────
-SELECT_COUNTRY, SELECT_LANG, CHAT, ANKETA_NAME, ANKETA_PHONE, ANKETA_CITY, ANKETA_INTEREST, PARTNER_ID, PARTNER_MENU, PARTNER_CONTACTS_NAME, PARTNER_CONTACTS_PHONE, ADMIN_MENU, PARTNER_QUIZ, PARTNER_FIO = range(14)
+SELECT_COUNTRY, SELECT_LANG, CHAT, ANKETA_NAME, ANKETA_PHONE, ANKETA_CITY, ANKETA_INTEREST, PARTNER_ID, PARTNER_MENU, PARTNER_CONTACTS_NAME, PARTNER_CONTACTS_PHONE, ADMIN_MENU, PARTNER_QUIZ, ANKETA_EMAIL = range(14)
 
 user_histories = {}
 
@@ -58,21 +58,20 @@ def _jsave(p, d):
         logger.error(f"jsave {p}: {e}")
 
 def is_partner(uid):        return str(uid) in _jload(_PARTNERS_F)
-def partner_add(uid, name, cid, lang, country="TKM"):
-    d = _jload(_PARTNERS_F); d[str(uid)] = {"name":name,"cid":cid,"lang":lang,"country":country}; _jsave(_PARTNERS_F, d)
+def partner_add(uid, name, cid, lang):
+    d = _jload(_PARTNERS_F); d[str(uid)] = {"name":name,"cid":cid,"lang":lang}; _jsave(_PARTNERS_F, d)
 
-async def partner_add_sheets(uid, name, cid, lang, uname, bot_instance=None, country="TKM"):
+async def partner_add_sheets(uid, name, cid, lang, uname, bot_instance=None):
     """Сохраняет партнёра в Google Sheets для постоянного хранения."""
     try:
         async with httpx.AsyncClient() as c:
             await c.post(GOOGLE_SHEET_URL, json={
-                "type":       "partner",
-                "user_id":    str(uid),
-                "name":       name,
+                "type": "partner",
+                "user_id": str(uid),
+                "name": name,
                 "company_id": cid,
-                "lang":       lang,
-                "username":   uname,
-                "country":    country,
+                "lang": lang,
+                "username": uname,
             }, timeout=10)
     except Exception as e:
         logger.error(f"partner_add_sheets: {e}")
@@ -363,15 +362,17 @@ async def send_slot_video(bot, chat_id: int, slot: str, lang: str = None):
 _TRIGGER_START_PREFIX = "trigger_start"
 _TRIGGER_IDLE_PREFIX  = "trigger_idle"
 
+_TRIGGER_DAY_PREFIX = "trigger_day"   # через N дней после /start
+
 def get_all_triggers() -> list:
-    """Возвращает список всех настроенных триггеров: [{"key":..., "lang":..., "minutes":..., "kind":...}, ...]"""
+    """Возвращает список всех настроенных триггеров."""
     d = _jload(_VIDEOS_F)
     result = []
     for key, val in d.items():
         if not (isinstance(val, list) and val):
             continue
         if key.startswith(_TRIGGER_START_PREFIX + "_"):
-            rest = key[len(_TRIGGER_START_PREFIX)+1:]   # lang_minutes
+            rest = key[len(_TRIGGER_START_PREFIX)+1:]
             parts = rest.split("_")
             if len(parts) == 2:
                 result.append({"key": key, "kind": "start", "lang": parts[0], "minutes": int(parts[1])})
@@ -380,9 +381,17 @@ def get_all_triggers() -> list:
             parts = rest.split("_")
             if len(parts) == 2:
                 result.append({"key": key, "kind": "idle", "lang": parts[0], "minutes": int(parts[1])})
+        elif key.startswith(_TRIGGER_DAY_PREFIX + "_"):
+            rest = key[len(_TRIGGER_DAY_PREFIX)+1:]   # lang_days
+            parts = rest.split("_")
+            if len(parts) == 2:
+                result.append({"key": key, "kind": "day", "lang": parts[0], "days": int(parts[1]),
+                                "minutes": int(parts[1]) * 1440})
     return result
 
-def trigger_key(kind: str, lang: str, minutes: int) -> str:
+def trigger_key(kind: str, lang: str, minutes: int = 0, days: int = 0) -> str:
+    if kind == "day":
+        return f"{_TRIGGER_DAY_PREFIX}_{lang}_{days}"
     prefix = _TRIGGER_START_PREFIX if kind == "start" else _TRIGGER_IDLE_PREFIX
     return f"{prefix}_{lang}_{minutes}"
 
@@ -402,7 +411,12 @@ async def _run_trigger_job(bot, chat_id: int, key: str, seconds: int):
 def schedule_triggers(context, uid: int, lang: str, kind: str):
     """Запускает все триггеры нужного вида для данного пользователя."""
     d = _jload(_VIDEOS_F)
-    prefix = _TRIGGER_START_PREFIX if kind == "start" else _TRIGGER_IDLE_PREFIX
+    if kind == "day":
+        prefix = _TRIGGER_DAY_PREFIX
+    elif kind == "start":
+        prefix = _TRIGGER_START_PREFIX
+    else:
+        prefix = _TRIGGER_IDLE_PREFIX
     for key, val in d.items():
         if not (isinstance(val, list) and val):
             continue
@@ -412,19 +426,20 @@ def schedule_triggers(context, uid: int, lang: str, kind: str):
         parts = rest.split("_")
         if len(parts) != 2:
             continue
-        klang, kmin = parts[0], parts[1]
+        klang, kval = parts[0], parts[1]
         if klang != lang:
             continue
-        seconds = int(kmin) * 60
-        task_key = f"trig_{kind}_{lang}_{kmin}"
-        # Отменяем предыдущий если был
+        seconds = int(kval) * (1440 * 60 if kind == "day" else 60)
+        task_key = f"trig_{kind}_{lang}_{kval}"
         old = context.user_data.pop(task_key, None)
         if old:
             try: old.cancel()
             except Exception: pass
-        task = asyncio.ensure_future(
-            _run_trigger_job(context.bot, uid, key, seconds)
-        )
+        try:
+            loop = asyncio.get_event_loop()
+            task = loop.create_task(_run_trigger_job(context.bot, uid, key, seconds))
+        except RuntimeError:
+            task = asyncio.ensure_future(_run_trigger_job(context.bot, uid, key, seconds))
         context.user_data[task_key] = task
         logger.info(f"⏱ Trigger {key} scheduled for uid={uid} in {seconds}s")
 
@@ -551,8 +566,7 @@ def contact_add(uid, name, phone):
 PT = {
     "ru": {
         "btn":          "🤝 Я партнёр",
-        "ask_fio":      "Введите ваши *ФИО* (Фамилия Имя Отчество):",
-        "ask_id":       "Хорошо! Теперь введите ваш *ID* из личного кабинета Vertera:",
+        "ask_id":       "Введите ваш *ID* из личного кабинета Vertera:",
         "wait":         "✅ Запрос отправлен! Ожидайте одобрения от администратора.",
         "approved":     "🎉 Вы одобрены как партнёр Vertera! Добро пожаловать в команду 🌿",
         "rejected":     "❌ Запрос отклонён. Свяжитесь с менеджером: @tach_ttt",
@@ -575,6 +589,10 @@ PT = {
         "btn_review_learn": "📖 Просмотреть обучение",
         "btn_review_mkt":   "📖 Просмотреть маркетинг",
         "btn_back":     "🔙 Выйти из меню партнёра",
+        "btn_reflink":  "🔗 Моя реферальная ссылка",
+        "btn_team":     "👥 Моя команда",
+        "btn_achieve":  "🏆 Мои достижения",
+        "btn_scripts":  "📎 Скрипты продаж",
         "calc_ask":     "Введите количество активных партнёров в вашей команде (число):",
         "c_empty":      "👥 Контактов пока нет. Добавьте первого!",
         "c_add":        "➕ Добавить контакт",
@@ -609,8 +627,7 @@ PT = {
     },
     "tk": {
         "btn":          "🤝 Men hyzmatdaş",
-        "ask_fio":      "*Doly adyňyzy* giriziň (Familiýa At Atasynyň ady):",
-        "ask_id":       "Bolýar! Vertera şahsy kabinetindäki *ID*-ňizi giriziň:",
+        "ask_id":       "Vertera şahsy kabinetindäki *ID*-ňizi giriziň:",
         "wait":         "✅ Isleg iberildi! Administratoryň tassyklamagyna garaşyň.",
         "approved":     "🎉 Siz Vertera hyzmatdaşy hökmünde tassyklandyňyz! 🌿",
         "rejected":     "❌ Isleg ret edildi. Menejer bilen habarlaşyň: @tach_ttt",
@@ -633,6 +650,10 @@ PT = {
         "btn_review_learn": "📖 Okuwы syn etmek",
         "btn_review_mkt":   "📖 Marketingi syn etmek",
         "btn_back":     "🔙 Hyzmatdaş menýusyndan çyk",
+        "btn_reflink":  "🔗 Meniň referral salgymy",
+        "btn_team":     "👥 Meniň toparymy",
+        "btn_achieve":  "🏆 Meniň üstünliklerim",
+        "btn_scripts":  "📎 Satuw skriptleri",
         "calc_ask":     "Toparyňyzdaky işjeň hyzmatdaşlaryň sanyny giriziň (san):",
         "c_empty":      "👥 Heniz kontakt ýok. Birinjisini goşuň!",
         "c_add":        "➕ Kontakt goş",
@@ -667,8 +688,7 @@ PT = {
     },
     "uz": {
         "btn":          "🤝 Men hamkorman",
-        "ask_fio":      "*To'liq ismingizni* kiriting (Familiya Ism Otasining ismi):",
-        "ask_id":       "Yaxshi! Vertera shaxsiy kabinetingizdagi *ID*-ni kiriting:",
+        "ask_id":       "Vertera shaxsiy kabinetingizdagi *ID*-ni kiriting:",
         "wait":         "✅ So'rov yuborildi! Administrator tasdiqlashini kuting.",
         "approved":     "🎉 Siz Vertera hamkori sifatida tasdiqlandi! 🌿",
         "rejected":     "❌ So'rov rad etildi. Menejer bilan bog'laning: @tach_ttt",
@@ -691,6 +711,10 @@ PT = {
         "btn_review_learn": "📖 O'qitishni ko'rish",
         "btn_review_mkt":   "📖 Marketingni ko'rish",
         "btn_back":     "🔙 Hamkorlik menyusidan chiqish",
+        "btn_reflink":  "🔗 Mening referal havolam",
+        "btn_team":     "👥 Mening jamoam",
+        "btn_achieve":  "🏆 Mening yutuqlarim",
+        "btn_scripts":  "📎 Sotuv skriptlari",
         "calc_ask":     "Jamoangizdagi faol hamkorlar sonini kiriting (raqam):",
         "c_empty":      "👥 Hali kontakt yo'q. Birinchisini qo'shing!",
         "c_add":        "➕ Kontakt qo'shish",
@@ -731,10 +755,22 @@ def get_partner_kb(lang):
         [[p["btn_learn"],    p["btn_market"]],
          [p["btn_academy"],  p["btn_quiz"]],
          [p["btn_contacts"], p["btn_webinar"]],
+         [p["btn_reflink"],  p["btn_team"]],
+         [p["btn_achieve"],  p["btn_scripts"]],
          [p["btn_news"],     p["btn_back"]]],
         resize_keyboard=True
     )
 
+
+def get_back_partner_kb(lang):
+    """Клавиатура с кнопкой возврата в партнёрское меню."""
+    back = {"ru": "🔙 В меню партнёра", "tk": "🔙 Hyzmatdaş menýusyna", "uz": "🔙 Hamkorlik menyusiga"}
+    return ReplyKeyboardMarkup([[back.get(lang, back["ru"])]], resize_keyboard=True)
+
+def add_back_partner(rows, lang):
+    """Добавляет кнопку возврата в конец списка кнопок."""
+    back = {"ru": "🔙 В меню партнёра", "tk": "🔙 Hyzmatdaş menýusyna", "uz": "🔙 Hamkorlik menyusiga"}
+    return rows + [[back.get(lang, back["ru"])]]
 
 # ─── Тексты на разных языках ─────────────────────────────────
 TEXTS = {
@@ -753,6 +789,7 @@ TEXTS = {
         "anketa_no": "❌ Нет, продолжить общение",
         "anketa_ok": "Хорошо, продолжаем! 😊 Задавайте любые вопросы.",
         "anketa_start": "Отлично! Анкета займёт 1 минуту 📝\n\n👤 Введите ваше имя и фамилию:",
+        "anketa_email": "📧 Введите вашу электронную почту (email):",
         "anketa_phone": "📱 Введите ваш номер телефона:",
         "anketa_city": "🌍 Введите ваш город:",
         "anketa_interest": "💡 Что вас интересует?",
@@ -776,6 +813,7 @@ TEXTS = {
         "anketa_no": "❌ Ýok, gürrüňdeşligi dowam etmek",
         "anketa_ok": "Bolýar, dowam edýäris! 😊 Islendik sorag beriň.",
         "anketa_start": "Ajaýyp! Anketa 1 minut alar 📝\n\n👤 Adyňyzy we familýaňyzy giriziň:",
+        "anketa_email": "📧 E-poçtaňyzy giriziň:",
         "anketa_phone": "📱 Telefon belgiňizi giriziň:",
         "anketa_city": "🌍 Şäheriňizi giriziň:",
         "anketa_interest": "💡 Sizi näme gyzyklandyrýar?",
@@ -799,6 +837,7 @@ TEXTS = {
         "anketa_no": "❌ Yo'q, suhbatni davom ettirish",
         "anketa_ok": "Yaxshi, davom etamiz! 😊 Istalgan savolni bering.",
         "anketa_start": "Ajoyib! Anketa 1 daqiqa oladi 📝\n\n👤 Ism va familiyangizni kiriting:",
+        "anketa_email": "📧 Elektron pochangizni kiriting (email):",
         "anketa_phone": "📱 Telefon raqamingizni kiriting:",
         "anketa_city": "🌍 Shahringizni kiriting:",
         "anketa_interest": "💡 Sizni nima qiziqtiradi?",
@@ -1225,6 +1264,8 @@ async def select_lang(update: Update, context: ContextTypes.DEFAULT_TYPE):
     schedule_triggers(context, user.id, lang, "start")
     # Запускаем триггеры «при неактивности»
     schedule_triggers(context, user.id, lang, "idle")
+    # Запускаем триггеры «через N дней»
+    schedule_triggers(context, user.id, lang, "day")
     return CHAT
 
 # ─── Основной чат ────────────────────────────────────────────
@@ -1244,10 +1285,18 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text in partner_btn_texts:
         p = PT.get(lang, PT["ru"])
         if is_partner(user.id):
-            await update.message.reply_text(p["already"], reply_markup=get_partner_kb(lang))
+            pdata = _jload(_PARTNERS_F).get(str(user.id), {})
+            pname = pdata.get("name", "")
+            fname = pname.split()[0] if pname.strip() else ""
+            greet_already = {
+                "ru": ("🤝 " + fname + ", добро пожаловать обратно!" if fname else p["already"]),
+                "tk": ("🤝 " + fname + ", ýene-de hoş geldiňiz!" if fname else p["already"]),
+                "uz": ("🤝 " + fname + ", qaytib kelganingiz bilan!" if fname else p["already"]),
+            }
+            await update.message.reply_text(greet_already.get(lang, p["already"]), reply_markup=get_partner_kb(lang))
             return PARTNER_MENU
-        await update.message.reply_text(p["ask_fio"], parse_mode="Markdown", reply_markup=ReplyKeyboardRemove())
-        return PARTNER_FIO
+        await update.message.reply_text(p["ask_id"], parse_mode="Markdown", reply_markup=ReplyKeyboardRemove())
+        return PARTNER_ID
 
     # Кнопка главная
     if text in [t["home"], "🔙 Главная", "🔙 Baş sahypa", "🔙 Bosh sahifa"]:
@@ -1293,7 +1342,7 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             logger.error(f"Buy notify: {e}")
         buy_menu = ReplyKeyboardMarkup(
-            [[t["anketa_yes"]], [t["register_btn"]], [t["home"]]],
+            [[t["register_btn"]], [t["anketa_yes"]], [t["home"]]],
             resize_keyboard=True
         )
         buy_text = {
@@ -1334,9 +1383,9 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.error(f"Biz notify: {e}")
         business_menu = ReplyKeyboardMarkup(
             [
+                [t["register_btn"]],
                 ["📊 Узнать больше о доходе"],
                 [t["anketa_yes"]],
-                [t["register_btn"]],
                 [t["home"]],
             ],
             resize_keyboard=True
@@ -1546,6 +1595,12 @@ async def start_anketa(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def anketa_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lang = context.user_data.get("lang", "ru")
     context.user_data["name"] = update.message.text
+    await update.message.reply_text(TEXTS[lang]["anketa_email"])
+    return ANKETA_EMAIL
+
+async def anketa_email(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    lang = context.user_data.get("lang", "ru")
+    context.user_data["email"] = update.message.text
     await update.message.reply_text(TEXTS[lang]["anketa_phone"])
     return ANKETA_PHONE
 
@@ -1575,6 +1630,7 @@ async def anketa_interest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["interest"] = update.message.text
 
     name = context.user_data.get("name", "—")
+    email = context.user_data.get("email", "—")
     user_phone = context.user_data.get("phone_user", "—")
     city = context.user_data.get("city", "—")
     interest = context.user_data.get("interest", "—")
@@ -1588,6 +1644,7 @@ async def anketa_interest(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "country":  country,
                 "lang":     lang,
                 "name":     name,
+                "email":    email,
                 "phone":    user_phone,
                 "city":     city,
                 "interest": interest,
@@ -1604,6 +1661,7 @@ async def anketa_interest(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"🌍 Страна: {country_label}\n"
                 f"🗣 Язык: {lang}\n"
                 f"👤 {name}\n"
+                f"📧 {email}\n"
                 f"📱 {user_phone}\n"
                 f"🏙 {city}\n"
                 f"💡 {interest}\n"
@@ -1622,32 +1680,20 @@ async def anketa_interest(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ─── Партнёрские хендлеры ────────────────────────────────────
 
-async def partner_receive_fio(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Шаг 1 — пользователь ввёл ФИО."""
-    lang = context.user_data.get("lang", "ru")
-    p    = PT.get(lang, PT["ru"])
-    context.user_data["partner_fio"] = update.message.text.strip()
-    await update.message.reply_text(p["ask_id"], parse_mode="Markdown")
-    return PARTNER_ID
-
-
 async def partner_receive_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Шаг 2 — пользователь ввёл ID Vertera — отправляем запрос менеджеру."""
+    """Пользователь ввёл ID компании — отправляем запрос менеджеру."""
     lang    = context.user_data.get("lang", "ru")
     user    = update.effective_user
     cid     = update.message.text.strip()
     p       = PT.get(lang, PT["ru"])
     uname   = f"@{user.username}" if user.username else str(user.id)
-    fio     = context.user_data.pop("partner_fio", user.full_name or uname)
-    country = context.user_data.get("country", "TKM")
 
     pending_add(user.id, {
-        "name":    fio,
-        "cid":     cid,
-        "lang":    lang,
-        "country": country,
-        "uname":   uname,
-        "uid":     user.id,
+        "name": user.full_name or uname,
+        "cid":  cid,
+        "lang": lang,
+        "uname": uname,
+        "uid":  user.id,
     })
 
     try:
@@ -1655,10 +1701,9 @@ async def partner_receive_id(update: Update, context: ContextTypes.DEFAULT_TYPE)
             chat_id=MANAGER_CHAT_ID,
             text=(
                 f"🤝 Новый запрос партнёра\n\n"
-                f"👤 ФИО: {fio}\n"
+                f"👤 {user.full_name or uname}\n"
                 f"🆔 Telegram: {uname}\n"
-                f"🏢 ID Vertera: {cid}\n"
-                f"🌍 Страна: {country} | Язык: {lang}\n\n"
+                f"🏢 ID Vertera: {cid}\n\n"
                 f"Одобрить: /ap{user.id}\n"
                 f"Отклонить: /rj{user.id}"
             )
@@ -2587,7 +2632,22 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     text = update.message.text
     p    = PT.get(lang, PT["ru"])
 
-    # Выход
+    # Кнопки "в меню партнёра" из любого подменю
+    back_to_partner_btns = {
+        "ru": "🔙 В меню партнёра",
+        "tk": "🔙 Hyzmatdaş menýusyna",
+        "uz": "🔙 Hamkorlik menyusiga",
+    }
+    if text == back_to_partner_btns.get(lang, back_to_partner_btns["ru"]) or        text in back_to_partner_btns.values():
+        context.user_data.pop("in_scripts", None)
+        context.user_data.pop("script_step", None)
+        context.user_data.pop("script_key", None)
+        await update.message.reply_text(
+            p["menu_title"], reply_markup=get_partner_kb(lang)
+        )
+        return PARTNER_MENU
+
+    # Выход из партнёрского меню в главное
     if text == p["btn_back"]:
         await update.message.reply_text(
             TEXTS[lang]["welcome"], parse_mode="Markdown",
@@ -2598,22 +2658,23 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     # Обучение — показываем текущий день
     if text == p["btn_learn"]:
         day = progress_get(user.id)
-        # Всегда синхронизируем с Sheets — защита от потери /tmp при перезапуске сервера
-        try:
-            async with httpx.AsyncClient(follow_redirects=True) as c:
-                resp = await c.post(GOOGLE_SHEET_URL,
-                                    json={"type": "get_progress", "user_id": str(user.id)}, timeout=10)
-                rdata = resp.json()
-                if rdata.get("status") == "ok" and rdata.get("progress"):
-                    for row in rdata["progress"]:
-                        if str(row.get("user_id","")).strip() == str(user.id):
-                            saved_day = int(row.get("day", 0))
-                            if saved_day > day:
-                                progress_set(user.id, saved_day)
-                                day = saved_day
-                            break
-        except Exception:
-            pass
+        if day == 0:
+            # Проверяем в Sheets — вдруг данные не загрузились при старте
+            try:
+                async with httpx.AsyncClient(follow_redirects=True) as c:
+                    resp = await c.post(GOOGLE_SHEET_URL,
+                                        json={"type": "get_progress", "user_id": str(user.id)}, timeout=10)
+                    rdata = resp.json()
+                    if rdata.get("status") == "ok" and rdata.get("progress"):
+                        for row in rdata["progress"]:
+                            if str(row.get("user_id","")).strip() == str(user.id):
+                                saved_day = int(row.get("day", 0))
+                                if saved_day > 0:
+                                    progress_set(user.id, saved_day)
+                                    day = saved_day
+                                break
+            except Exception:
+                pass
         if day == 0:
             # Первый вход — запускаем День 1
             progress_set(user.id, 1)
@@ -3082,54 +3143,17 @@ async def partner_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     info = pending_get(uid)
     if not info:
         await update.message.reply_text("Запрос не найден."); return
-    partner_add(uid, info.get("name",""), info.get("cid",""), info.get("lang","ru"), info.get("country","TKM"))
+    partner_add(uid, info.get("name",""), info.get("cid",""), info.get("lang","ru"))
     pending_del(uid)
     lang  = info.get("lang","ru")
     uname = info.get("uname","")
     p     = PT.get(lang, PT["ru"])
     # Сохраняем в Google Sheets (постоянное хранение)
-    await partner_add_sheets(uid, info.get("name",""), info.get("cid",""), lang, uname, country=info.get("country","TKM"))
+    await partner_add_sheets(uid, info.get("name",""), info.get("cid",""), lang, uname)
     try:
         await send_slot_video(context.bot, uid, "partner_ok", lang)
-        first_name = info.get("name","").split()[0] if info.get("name","").strip() else ""
-        greet = {
-            "ru": (
-                ("🎉 " + first_name + ", добро пожаловать в команду Vertera!\n\n" if first_name else "🎉 Добро пожаловать в команду Vertera!\n\n") +
-                "Вы одобрены как официальный партнёр 🌿\n\n"
-                "Теперь вам доступно:\n"
-                "📚 Обучение для новичков (7 дней)\n"
-                "📊 Маркетинг-план (7 дней)\n"
-                "🧪 Тесты\n"
-                "🔗 Реферальная ссылка\n"
-                "👥 Моя команда\n\n"
-                "Начните с «📚 Обучение для новичков» 👇"
-            ),
-            "tk": (
-                ("🎉 " + first_name + ", Vertera toparyna hoş geldiňiz!\n\n" if first_name else "🎉 Vertera toparyna hoş geldiňiz!\n\n") +
-                "Siz resmi hyzmatdaş hökmünde tassyklandyňyz 🌿\n\n"
-                "Indi size elýeterli:\n"
-                "📚 Täze başlanlar üçin okuw (7 gün)\n"
-                "📊 Marketing meýilnamasy (7 gün)\n"
-                "🧪 Testler\n"
-                "🔗 Referral salgy\n"
-                "👥 Meniň toparymy\n\n"
-                "«📚 Täze başlanlar üçin okuw» bölümden başlaň 👇"
-            ),
-            "uz": (
-                ("🎉 " + first_name + ", Vertera jamoasiga xush kelibsiz!\n\n" if first_name else "🎉 Vertera jamoasiga xush kelibsiz!\n\n") +
-                "Siz rasmiy hamkor sifatida tasdiqlandi 🌿\n\n"
-                "Endi sizga mavjud:\n"
-                "📚 Yangilar uchun o'qitish (7 kun)\n"
-                "📊 Marketing rejasi (7 kun)\n"
-                "🧪 Testlar\n"
-                "🔗 Referal havola\n"
-                "👥 Mening jamoam\n\n"
-                "«📚 Yangilar uchun o'qitish» bo'limidan boshlang 👇"
-            ),
-        }
         await context.bot.send_message(
-            chat_id=uid,
-            text=greet.get(lang, greet["ru"]),
+            chat_id=uid, text=p["approved"],
             reply_markup=get_partner_kb(lang)
         )
         # Запускаем серию напоминаний
@@ -3211,8 +3235,7 @@ ADMIN_KB = ReplyKeyboardMarkup(
     [["👥 Список партнёров",  "📋 Заявки на вебинар"],
      ["📰 Добавить новость",  "🎬 Управление видео"],
      ["🎥 Отправить кружок",  "📢 Пост всем пользователям"],
-     ["📣 Рассылка партнёрам","🌍 Сменить язык/страну"],
-     ["🔙 Выход из админ-меню"]],
+     ["📣 Рассылка партнёрам","🔙 Выход из админ-меню"]],
     resize_keyboard=True
 )
 
@@ -3272,48 +3295,6 @@ async def admin_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return CHAT
     text = update.message.text
 
-    # ── Смена языка/страны для тестирования ─────────────────
-    if text == "🌍 Сменить язык/страну":
-        context.user_data["admin_switch"] = True
-        cur_lang    = context.user_data.get("lang", "ru")
-        cur_country = context.user_data.get("country", "TKM")
-        kb = ReplyKeyboardMarkup([
-            ["🇷🇺 РУ + Туркменистан", "🇹🇲 ТМ + Туркменистан"],
-            ["🇷🇺 РУ + Узбекистан",   "🇺🇿 УЗ + Узбекистан"],
-            ["🔙 Отмена"]
-        ], resize_keyboard=True)
-        await update.message.reply_text(
-            "🌍 *Смена языка и страны*\n\n"
-            "Текущий режим: язык *" + cur_lang + "*, страна *" + cur_country + "*\n\n"
-            "Выберите нужную комбинацию:",
-            parse_mode="Markdown", reply_markup=kb
-        )
-        return ADMIN_MENU
-
-    if context.user_data.get("admin_switch"):
-        switch_map = {
-            "🇷🇺 РУ + Туркменистан": ("ru", "TKM"),
-            "🇹🇲 ТМ + Туркменистан": ("tk", "TKM"),
-            "🇷🇺 РУ + Узбекистан":   ("ru", "UZB"),
-            "🇺🇿 УЗ + Узбекистан":   ("uz", "UZB"),
-        }
-        if text in switch_map:
-            new_lang, new_country = switch_map[text]
-            context.user_data["lang"]    = new_lang
-            context.user_data["country"] = new_country
-            context.user_data.pop("admin_switch", None)
-            await update.message.reply_text(
-                "✅ Переключено: язык *" + new_lang + "*, страна *" + new_country + "*\n\n"
-                "Теперь все функции бота работают в этом режиме.\n"
-                "Снова нажмите «🌍 Сменить язык/страну» чтобы изменить.",
-                parse_mode="Markdown", reply_markup=ADMIN_KB
-            )
-            return ADMIN_MENU
-        if text == "🔙 Отмена":
-            context.user_data.pop("admin_switch", None)
-            await update.message.reply_text("Отменено.", reply_markup=ADMIN_KB)
-            return ADMIN_MENU
-
     if text == "🔙 Выход из админ-меню":
         await update.message.reply_text(
             "Вышли из меню администратора.",
@@ -3369,6 +3350,7 @@ async def admin_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["avm"] = {"step": "main"}
         kb = ReplyKeyboardMarkup([
             ["📌 Видео для слотов", "⏱ Триггерные видео"],
+            ["📅 Видео по дням (день 1, 7, 15...)"],
             ["🔙 Назад в меню"]
         ], resize_keyboard=True)
         await update.message.reply_text(
@@ -3402,6 +3384,27 @@ async def admin_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "📌 *Видео для слотов*\n✅ — есть видео | ⬜ — пусто\n\nВыберите слот:",
                 parse_mode="Markdown",
                 reply_markup=ReplyKeyboardMarkup(rows, resize_keyboard=True)
+            )
+            return ADMIN_MENU
+
+        elif text == "📅 Видео по дням (день 1, 7, 15...)":
+            context.user_data["avm"] = {"step": "day_triggers_main"}
+            triggers = [t for t in get_all_triggers() if t["kind"] == "day"]
+            lines = []
+            for tr in triggers:
+                cnt = vlist_count(tr["key"])
+                lines.append(f"• {LANG_LABELS.get(tr['lang'], tr['lang'])} — через {tr['days']} дн. ({cnt} вид.)")
+            tlist = "\n".join(lines) if lines else "Дневных триггеров пока нет."
+            kb = ReplyKeyboardMarkup([
+                ["➕ Добавить дневной триггер", "🗑 Удалить дневной триггер"],
+                ["🔙 Назад"]
+            ], resize_keyboard=True)
+            await update.message.reply_text(
+                "📅 *Видео по дням*\n\n"
+                "Видео отправляется через N дней после того как пользователь запустил бота.\n\n"
+                + tlist + "\n\n"
+                + "Примеры: день 1, день 7, день 15, день 30...",
+                parse_mode="Markdown", reply_markup=kb
             )
             return ADMIN_MENU
 
@@ -3721,6 +3724,31 @@ async def admin_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data["avm"] = {"step": "triggers_main"}
             return ADMIN_MENU
 
+    elif avm.get("step") == "day_trig_confirm":
+        key = avm.get("key"); lang = avm.get("lang"); days = avm.get("days")
+        if text == "✅ Готово — сохранить триггер":
+            context.user_data.pop("avm", None)
+            await update.message.reply_text(
+                f"✅ Дневной триггер сохранён!"
+                f"*{LANG_LABELS.get(lang, lang)} / через {days} дней*"
+                f"Видео в очереди: {vlist_count(key)}",
+                parse_mode="Markdown", reply_markup=ADMIN_KB
+            )
+            return ADMIN_MENU
+        if text == "🔙 Отмена":
+            context.user_data["avm"] = {"step": "day_triggers_main"}
+            return ADMIN_MENU
+        if text == "➕ Добавить ещё видео в этот триггер":
+            context.user_data["avm"]["step"] = "day_trig_add_video"
+            kb = ReplyKeyboardMarkup([
+                ["Пауза: 0 сек", "Пауза: 5 сек", "Пауза: 10 сек"],
+                ["Пауза: 30 сек", "Пауза: 60 сек"],
+                ["🔙 Отмена"]
+            ], resize_keyboard=True)
+            await update.message.reply_text(
+                f"➕ Видео #{vlist_count(key)+1} — выберите паузу:", reply_markup=kb)
+            return ADMIN_MENU
+
     # ── Триггеры: подтверждение после добавления видео ────
     elif avm.get("step") == "trig_confirm":
         key = avm.get("key"); kind = avm.get("kind")
@@ -3934,6 +3962,27 @@ async def admin_circle_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         await _show_slot_detail(update, key, slot, lang)
         return ADMIN_MENU
 
+    # ── Ожидаем видео для дневного триггера ──
+    if avm.get("step") == "day_trig_waiting_video":
+        key = avm.get("key"); lang = avm.get("lang"); days = avm.get("days")
+        delay = avm.get("delay", 0)
+        vlist_add(key, file_id, vtype, delay=delay)
+        await videos_save_to_sheets()
+        lst = vlist_get(key)
+        kb = ReplyKeyboardMarkup([
+            ["➕ Добавить ещё видео в этот триггер"],
+            ["✅ Готово — сохранить триггер"],
+            ["🔙 Отмена"]
+        ], resize_keyboard=True)
+        await update.message.reply_text(
+            f"✅ Видео #{len(lst)} добавлено в дневной триггер!"
+            f"*{LANG_LABELS.get(lang, lang)} / через {days} дней*\n\n"
+            f"Всего видео: {len(lst)}\n\nДобавить ещё или сохранить?",
+            parse_mode="Markdown", reply_markup=kb
+        )
+        context.user_data["avm"]["step"] = "day_trig_confirm"
+        return ADMIN_MENU
+
     # ── Ожидаем видео для триггера ──
     if avm.get("step") == "trig_waiting_video":
         key = avm.get("key"); kind = avm.get("kind")
@@ -3993,12 +4042,12 @@ def main():
             SELECT_COUNTRY:        [MessageHandler(filters.TEXT & ~filters.COMMAND, select_country)],
             SELECT_LANG:           [MessageHandler(filters.TEXT & ~filters.COMMAND, select_lang)],
             CHAT:                  [MessageHandler(filters.TEXT & ~filters.COMMAND, chat_with_gpt)],
-            PARTNER_FIO:           [MessageHandler(filters.TEXT & ~filters.COMMAND, partner_receive_fio)],
             PARTNER_ID:            [MessageHandler(filters.TEXT & ~filters.COMMAND, partner_receive_id)],
             PARTNER_MENU:          [MessageHandler(filters.TEXT & ~filters.COMMAND, partner_menu_handler)],
             PARTNER_CONTACTS_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, partner_contacts_name)],
             PARTNER_CONTACTS_PHONE:[MessageHandler(filters.TEXT & ~filters.COMMAND, partner_contacts_phone)],
             ANKETA_NAME:           [MessageHandler(filters.TEXT & ~filters.COMMAND, anketa_name)],
+            ANKETA_EMAIL:          [MessageHandler(filters.TEXT & ~filters.COMMAND, anketa_email)],
             ANKETA_PHONE:          [MessageHandler(filters.TEXT & ~filters.COMMAND, anketa_phone)],
             ANKETA_CITY:           [MessageHandler(filters.TEXT & ~filters.COMMAND, anketa_city)],
             ANKETA_INTEREST:       [MessageHandler(filters.TEXT & ~filters.COMMAND, anketa_interest)],
