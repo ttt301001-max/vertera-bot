@@ -1,7 +1,7 @@
 import os
 import logging
 import httpx
-from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
     filters, ContextTypes, ConversationHandler
@@ -25,10 +25,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ─── Состояния ───────────────────────────────────────────────
-SELECT_COUNTRY, SELECT_LANG, CHAT, ANKETA_NAME, ANKETA_PHONE, ANKETA_CITY, ANKETA_INTEREST, PARTNER_ID, PARTNER_MENU, PARTNER_CONTACTS_NAME, PARTNER_CONTACTS_PHONE, ADMIN_MENU, PARTNER_QUIZ = range(13)
+SELECT_COUNTRY, SELECT_LANG, CHAT, ANKETA_NAME, ANKETA_PHONE, ANKETA_CITY, ANKETA_INTEREST, PARTNER_ID, PARTNER_MENU, PARTNER_CONTACTS_NAME, PARTNER_CONTACTS_PHONE, ADMIN_MENU, PARTNER_QUIZ, ANKETA_BIRTHDAY = range(14)
 
 user_histories = {}
-BOT_USERNAME = "Verteratkmbot"
 
 import json, pathlib
 
@@ -39,14 +38,13 @@ _CONTACTS_F  = pathlib.Path("/tmp/vrt_contacts.json")
 _WEBINAR_F   = pathlib.Path("/tmp/vrt_webinar.json")
 _NEWS_F      = pathlib.Path("/tmp/vrt_news.json")
 _PROGRESS_F  = pathlib.Path("/tmp/vrt_progress.json")
+_PROG_DATES_F = pathlib.Path("/tmp/vrt_prog_dates.json")
 _MKTPROG_F   = pathlib.Path("/tmp/vrt_mkt_progress.json")
 _QUIZ_F      = pathlib.Path("/tmp/vrt_quiz.json")
 _VIDEOS_F    = pathlib.Path("/tmp/vrt_videos.json")
 _MKTPROG_F   = pathlib.Path("/tmp/vrt_mkt_progress.json")
 _QUIZ_F      = pathlib.Path("/tmp/vrt_quiz.json")
 _USERS_F     = pathlib.Path("/tmp/vrt_users.json")
-_REFERRALS_F = pathlib.Path("/tmp/vrt_referrals.json")
-_WISHES_F    = pathlib.Path("/tmp/vrt_wishes.json")
 
 def _jload(p):
     try:
@@ -61,94 +59,10 @@ def _jsave(p, d):
         logger.error(f"jsave {p}: {e}")
 
 def is_partner(uid):        return str(uid) in _jload(_PARTNERS_F)
+def partner_add(uid, name, cid, lang):
+    d = _jload(_PARTNERS_F); d[str(uid)] = {"name":name,"cid":cid,"lang":lang}; _jsave(_PARTNERS_F, d)
 
-# ─── Рефералы ─────────────────────────────────────────────────
-def ref_add(inviter_uid: int, new_uid: int, new_name: str, new_uname: str):
-    d = _jload(_REFERRALS_F)
-    key = str(inviter_uid)
-    lst = d.get(key, [])
-    if not any(str(r.get("uid")) == str(new_uid) for r in lst):
-        lst.append({"uid": str(new_uid), "name": new_name, "uname": new_uname})
-        d[key] = lst
-        _jsave(_REFERRALS_F, d)
-
-def ref_get(inviter_uid: int) -> list:
-    return _jload(_REFERRALS_F).get(str(inviter_uid), [])
-
-def ref_count(inviter_uid: int) -> int:
-    return len(ref_get(inviter_uid))
-
-async def ref_sync_to_sheets(inviter_uid: int, new_uid: int, new_name: str, new_uname: str, lang: str):
-    """Сохраняет реферала в Google Sheets."""
-    try:
-        import json as _json
-        async with httpx.AsyncClient(follow_redirects=True) as c:
-            await c.post(GOOGLE_SHEET_URL, json={
-                "type":       "referral",
-                "inviter_id": str(inviter_uid),
-                "user_id":    str(new_uid),
-                "name":       new_name,
-                "username":   new_uname,
-                "lang":       lang,
-            }, timeout=10)
-    except Exception as e:
-        logger.error(f"ref_sync: {e}")
-
-async def refs_load_from_sheets():
-    """Загружает рефералов из Sheets при старте."""
-    try:
-        async with httpx.AsyncClient(follow_redirects=True) as c:
-            resp = await c.post(GOOGLE_SHEET_URL, json={"type": "get_referrals"}, timeout=15)
-            data = resp.json()
-        if data.get("status") == "ok" and data.get("referrals"):
-            import json as _json
-            d = _json.loads(data["referrals"])
-            _jsave(_REFERRALS_F, d)
-            logger.info(f"✅ Рефералы загружены: {sum(len(v) for v in d.values())} записей")
-    except Exception as e:
-        logger.error(f"refs_load: {e}")
-
-async def refs_save_to_sheets():
-    """Сохраняет все рефералы в Sheets."""
-    try:
-        import json as _json
-        d = _jload(_REFERRALS_F)
-        async with httpx.AsyncClient(follow_redirects=True) as c:
-            await c.post(GOOGLE_SHEET_URL, json={
-                "type": "save_referrals",
-                "referrals": _json.dumps(d, ensure_ascii=False),
-            }, timeout=15)
-    except Exception as e:
-        logger.error(f"refs_save: {e}")
-
-# ─── Пожелания ────────────────────────────────────────────────
-def wishes_add(uid: int, name: str, uname: str, text: str):
-    d = _jload(_WISHES_F)
-    lst = d.get("wishes", [])
-    import time as _time_mod
-    lst.append({"uid": str(uid), "name": name, "uname": uname, "text": text, "ts": int(_time_mod.time())})
-    d["wishes"] = lst
-    _jsave(_WISHES_F, d)
-
-async def wish_sync_to_sheets(uid: int, name: str, uname: str, text: str, lang: str):
-    try:
-        async with httpx.AsyncClient(follow_redirects=True) as c:
-            await c.post(GOOGLE_SHEET_URL, json={
-                "type":     "wish",
-                "user_id":  str(uid),
-                "name":     name,
-                "username": uname,
-                "text":     text,
-                "lang":     lang,
-            }, timeout=10)
-    except Exception as e:
-        logger.error(f"wish_sync: {e}")
-
-
-def partner_add(uid, name, cid, lang, country="TKM"):
-    d = _jload(_PARTNERS_F); d[str(uid)] = {"name":name,"cid":cid,"lang":lang,"country":country}; _jsave(_PARTNERS_F, d)
-
-async def partner_add_sheets(uid, name, cid, lang, uname, bot_instance=None, country="TKM"):
+async def partner_add_sheets(uid, name, cid, lang, uname, bot_instance=None):
     """Сохраняет партнёра в Google Sheets для постоянного хранения."""
     try:
         async with httpx.AsyncClient() as c:
@@ -158,7 +72,6 @@ async def partner_add_sheets(uid, name, cid, lang, uname, bot_instance=None, cou
                 "name": name,
                 "company_id": cid,
                 "lang": lang,
-                "country": country,
                 "username": uname,
             }, timeout=10)
     except Exception as e:
@@ -218,6 +131,47 @@ async def users_load_from_sheets():
                 logger.info(f"✅ Загружено {len(data['users'])} пользователей из Sheets")
     except Exception as e:
         logger.error(f"users_load_from_sheets: {e}")
+
+
+import datetime as _dt_mod
+
+def _today_iso():
+    return _dt_mod.date.today().isoformat()
+
+def _prog_dates():
+    return _jload(_PROG_DATES_F)
+
+def learn_date_set(uid: int, day: int):
+    d = _prog_dates()
+    d[f"l_{uid}_{day}"] = _today_iso()
+    _jsave(_PROG_DATES_F, d)
+
+def learn_date_get(uid: int, day: int) -> str:
+    return _prog_dates().get(f"l_{uid}_{day}", "")
+
+def learn_can_open(uid: int, day: int) -> bool:
+    if day <= 1:
+        return True
+    s = learn_date_get(uid, day - 1)
+    if not s:
+        return True
+    return _dt_mod.date.today() >= _dt_mod.date.fromisoformat(s) + _dt_mod.timedelta(days=1)
+
+def mkt_date_set(uid: int, day: int):
+    d = _prog_dates()
+    d[f"m_{uid}_{day}"] = _today_iso()
+    _jsave(_PROG_DATES_F, d)
+
+def mkt_date_get(uid: int, day: int) -> str:
+    return _prog_dates().get(f"m_{uid}_{day}", "")
+
+def mkt_can_open(uid: int, day: int) -> bool:
+    if day <= 1:
+        return True
+    s = mkt_date_get(uid, day - 1)
+    if not s:
+        return True
+    return _dt_mod.date.today() >= _dt_mod.date.fromisoformat(s) + _dt_mod.timedelta(days=1)
 
 def progress_get(uid: int) -> int:
     """Возвращает текущий день партнёра (0 = не начал, 1-7 = день)."""
@@ -662,8 +616,6 @@ PT = {
         "btn_review_mkt":   "📖 Просмотреть маркетинг",
         "btn_back":     "🔙 Выйти из меню партнёра",
         "btn_partner_menu": "🏠 Меню партнёра",
-        "btn_reflink":  "🔗 Моя реферальная ссылка",
-        "btn_team":     "👥 Моя команда",
         "btn_achieve":  "🏆 Мои достижения",
         "btn_scripts":  "📎 Скрипты продаж",
         "btn_wishes":   "💌 Пожелания",
@@ -725,8 +677,6 @@ PT = {
         "btn_review_mkt":   "📖 Marketingi syn etmek",
         "btn_back":     "🔙 Hyzmatdaş menýusyndan çyk",
         "btn_partner_menu": "🏠 Hyzmatdaş menýusy",
-        "btn_reflink":  "🔗 Meniň referral salgymy",
-        "btn_team":     "👥 Meniň toparymy",
         "btn_achieve":  "🏆 Meniň üstünliklerim",
         "btn_scripts":  "📎 Satuw skriptleri",
         "btn_wishes":   "💌 Islegler",
@@ -788,8 +738,6 @@ PT = {
         "btn_review_mkt":   "📖 Marketingni ko'rish",
         "btn_back":     "🔙 Hamkorlik menyusidan chiqish",
         "btn_partner_menu": "🏠 Hamkorlik menyusi",
-        "btn_reflink":  "🔗 Mening referal havolam",
-        "btn_team":     "👥 Mening jamoam",
         "btn_achieve":  "🏆 Mening yutuqlarim",
         "btn_scripts":  "📎 Sotuv skriptlari",
         "btn_wishes":   "💌 Takliflar",
@@ -829,23 +777,20 @@ PT = {
 
 def get_partner_kb(lang):
     p = PT.get(lang, PT["ru"])
-    return ReplyKeyboardMarkup(
-        [[p["btn_learn"],    p["btn_market"]],
-         [p["btn_academy"],  p["btn_quiz"]],
-         [p["btn_contacts"], p["btn_webinar"]],
-         [p["btn_reflink"],  p["btn_team"]],
-         [p["btn_achieve"],  p["btn_scripts"]],
-         [p["btn_wishes"],   p["btn_news"]],
-         [p["btn_back"]]],
-        resize_keyboard=True
-    )
+    return ReplyKeyboardMarkup([
+        [p["btn_learn"],   p["btn_market"]],
+        [p["btn_academy"], p["btn_quiz"]],
+        [p["btn_achieve"], p["btn_scripts"]],
+        [p["btn_contacts"],p["btn_webinar"]],
+        [p["btn_wishes"],  p["btn_news"]],
+        [p["btn_back"]],
+    ], resize_keyboard=True)
 
-def partner_sub_kb(lang, extra_rows=None):
-    """Клавиатура для подменю — содержит кнопку возврата в меню партнёра."""
+def partner_sub_kb(lang, rows=None):
     p = PT.get(lang, PT["ru"])
-    rows = extra_rows or []
-    rows.append([p["btn_partner_menu"]])
-    return ReplyKeyboardMarkup(rows, resize_keyboard=True)
+    r = rows or []
+    r.append([p["btn_partner_menu"]])
+    return ReplyKeyboardMarkup(r, resize_keyboard=True)
 
 
 # ─── Тексты на разных языках ─────────────────────────────────
@@ -865,6 +810,7 @@ TEXTS = {
         "anketa_no": "❌ Нет, продолжить общение",
         "anketa_ok": "Хорошо, продолжаем! 😊 Задавайте любые вопросы.",
         "anketa_start": "Отлично! Анкета займёт 1 минуту 📝\n\n👤 Введите ваше имя и фамилию:",
+        "anketa_birthday": "🎂 Введите дату рождения (например: 15.03.1990):",
         "anketa_phone": "📱 Введите ваш номер телефона:",
         "anketa_city": "🌍 Введите ваш город:",
         "anketa_interest": "💡 Что вас интересует?",
@@ -888,6 +834,7 @@ TEXTS = {
         "anketa_no": "❌ Ýok, gürrüňdeşligi dowam etmek",
         "anketa_ok": "Bolýar, dowam edýäris! 😊 Islendik sorag beriň.",
         "anketa_start": "Ajaýyp! Anketa 1 minut alar 📝\n\n👤 Adyňyzy we familýaňyzy giriziň:",
+        "anketa_birthday": "🎂 Doglan günüňizi giriziň (15.03.1990):",
         "anketa_phone": "📱 Telefon belgiňizi giriziň:",
         "anketa_city": "🌍 Şäheriňizi giriziň:",
         "anketa_interest": "💡 Sizi näme gyzyklandyrýar?",
@@ -911,6 +858,7 @@ TEXTS = {
         "anketa_no": "❌ Yo'q, suhbatni davom ettirish",
         "anketa_ok": "Yaxshi, davom etamiz! 😊 Istalgan savolni bering.",
         "anketa_start": "Ajoyib! Anketa 1 daqiqa oladi 📝\n\n👤 Ism va familiyangizni kiriting:",
+        "anketa_birthday": "🎂 Tug'ilgan kuningizni kiriting (15.03.1990):",
         "anketa_phone": "📱 Telefon raqamingizni kiriting:",
         "anketa_city": "🌍 Shahringizni kiriting:",
         "anketa_interest": "💡 Sizni nima qiziqtiradi?",
@@ -1270,7 +1218,6 @@ async def _load_partners_impl(app=None):
     await mkt_progress_load()
     await quiz_load()
     await users_load_from_sheets()
-    await refs_load_from_sheets()
     await videos_load_from_sheets()   # ← Загружаем видео из Sheets при каждом старте
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1357,11 +1304,28 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text in partner_btn_texts:
         p = PT.get(lang, PT["ru"])
         if is_partner(user.id):
-            pdata = _jload(_PARTNERS_F).get(str(user.id), {})
-            pname = pdata.get("name", "")
+            # Проверяем есть ли дата рождения у этого партнёра
+            users_data = _jload(_USERS_F)
+            uid_str = str(user.id)
+            has_bday = bool(users_data.get(uid_str, {}).get("birthday", ""))
+            if not has_bday and not context.user_data.get("bday_asked"):
+                context.user_data["bday_asked"] = True
+                context.user_data["bday_for_partner"] = True
+                bday_ask = {
+                    "ru": "🎂 Привет! Мы хотим поздравлять вас с днём рождения. Введите вашу дату рождения (например: 15.03.1990):",
+                    "tk": "🎂 Salam! Doglan günüňizi gutlamak isleýäris. Doglan günüňizi giriziň (mysal: 15.03.1990):",
+                    "uz": "🎂 Salom! Sizi tug'ilgan kuningiz bilan tabriklamoqchimiz. Tug'ilgan kuningizni kiriting (masalan: 15.03.1990):",
+                }
+                skip_bday = {"ru": "⏭ Пропустить", "tk": "⏭ Geçir", "uz": "⏭ O'tkazish"}
+                await update.message.reply_text(
+                    bday_ask.get(lang, bday_ask["ru"]),
+                    reply_markup=ReplyKeyboardMarkup([[skip_bday.get(lang, skip_bday["ru"])]], resize_keyboard=True)
+                )
+                return PARTNER_MENU
+            pname = _jload(_PARTNERS_F).get(uid_str, {}).get("name", "")
             fname = pname.strip().split()[0] if pname.strip() else ""
             greet = {
-                "ru": "🌿 *Dream Team Vertera*\n\n" + (f"Привет, {fname}! " if fname else "Привет! ") + "Добро пожаловать в партнёрское меню 🤝",
+                "ru": "🌿 *Dream Team Vertera*\n\n" + (f"Привет, {fname}! " if fname else "Привет! ") + "Добро пожаловать в меню партнёра 🤝",
                 "tk": "🌿 *Dream Team Vertera*\n\n" + (f"Salam, {fname}! " if fname else "Salam! ") + "Hyzmatdaş menýusyna hoş geldiňiz 🤝",
                 "uz": "🌿 *Dream Team Vertera*\n\n" + (f"Salom, {fname}! " if fname else "Salom! ") + "Hamkorlik menyusiga xush kelibsiz 🤝",
             }
@@ -1414,7 +1378,7 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             logger.error(f"Buy notify: {e}")
         buy_menu = ReplyKeyboardMarkup(
-            [[t["register_btn"]], [t["anketa_yes"]], [t["home"]]],
+            [[t["anketa_yes"]], [t["register_btn"]], [t["home"]]],
             resize_keyboard=True
         )
         buy_text = {
@@ -1455,9 +1419,9 @@ async def chat_with_gpt(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.error(f"Biz notify: {e}")
         business_menu = ReplyKeyboardMarkup(
             [
-                [t["register_btn"]],
                 ["📊 Узнать больше о доходе"],
                 [t["anketa_yes"]],
+                [t["register_btn"]],
                 [t["home"]],
             ],
             resize_keyboard=True
@@ -1667,6 +1631,12 @@ async def start_anketa(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def anketa_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lang = context.user_data.get("lang", "ru")
     context.user_data["name"] = update.message.text
+    await update.message.reply_text(TEXTS[lang]["anketa_birthday"])
+    return ANKETA_BIRTHDAY
+
+async def anketa_birthday(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    lang = context.user_data.get("lang", "ru")
+    context.user_data["birthday"] = update.message.text.strip()
     await update.message.reply_text(TEXTS[lang]["anketa_phone"])
     return ANKETA_PHONE
 
@@ -1695,7 +1665,8 @@ async def anketa_interest(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     context.user_data["interest"] = update.message.text
 
-    name = context.user_data.get("name", "—")
+    name     = context.user_data.get("name", "—")
+    birthday = context.user_data.get("birthday", "—")
     user_phone = context.user_data.get("phone_user", "—")
     city = context.user_data.get("city", "—")
     interest = context.user_data.get("interest", "—")
@@ -1709,6 +1680,7 @@ async def anketa_interest(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "country":  country,
                 "lang":     lang,
                 "name":     name,
+                "birthday": birthday,
                 "phone":    user_phone,
                 "city":     city,
                 "interest": interest,
@@ -1725,6 +1697,7 @@ async def anketa_interest(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"🌍 Страна: {country_label}\n"
                 f"🗣 Язык: {lang}\n"
                 f"👤 {name}\n"
+                f"🎂 {birthday}\n"
                 f"📱 {user_phone}\n"
                 f"🏙 {city}\n"
                 f"💡 {interest}\n"
@@ -1751,14 +1724,12 @@ async def partner_receive_id(update: Update, context: ContextTypes.DEFAULT_TYPE)
     p       = PT.get(lang, PT["ru"])
     uname   = f"@{user.username}" if user.username else str(user.id)
 
-    country = context.user_data.get("country", "TKM")
     pending_add(user.id, {
-        "name":    user.full_name or uname,
-        "cid":     cid,
-        "lang":    lang,
-        "country": country,
-        "uname":   uname,
-        "uid":     user.id,
+        "name": user.full_name or uname,
+        "cid":  cid,
+        "lang": lang,
+        "uname": uname,
+        "uid":  user.id,
     })
 
     try:
@@ -2149,6 +2120,60 @@ QUIZ_DATA = {
         {"q":{"ru":"Цель ежедневного контроля?","tk":"Her günki gözegçiligiň maksady?","uz":"Kunlik nazorat maqsadi?"},
          "o":{"ru":["А) Считать деньги","Б) Ежедневная связь с наставником","В) Проверять продажи"],"tk":["A) Pul san","B) Nastawnik bilen aragatnaşyk","C) Satyşlary barla"],"uz":["A) Pul hisoblash","B) Murabbiy bilan aloqa","V) Sotuvlarni tekshirish"]},
          "a":1,"e":{"ru":"Ежедневный контроль = ежедневная связь с наставником для поддержки.","tk":"Her günki nastawnik aragatnaşygy.","uz":"Kunlik murabbiy aloqasi."}},
+        {"q":{"ru":"Что значит активный партнёр?","tk":"Işjeň hyzmatdaş näme?","uz":"Faol hamkor nima?"},
+         "o":{"ru":["А) Зарегистрировался","Б) Делает личный товарооборот","В) Посетил вебинар"],"tk":["A) Hasaba alyndy","B) Şahsy tovar aýlanyşy edýär","C) Webinara gatnaşdy"],"uz":["A) Ro'yxatdan o'tdi","B) Shaxsiy tovar aylanmasi qiladi","V) Vebinarga qatnashdi"]},
+         "a":1,"e":{"ru":"Активный партнёр делает личный товарооборот.","tk":"Işjeň hyzmatdaş ŞTA edýär.","uz":"Faol hamkor ShTA qiladi."}},
+        {"q":{"ru":"Что такое ЛТО?","tk":"ŞTA näme?","uz":"ShTA nima?"},
+         "o":{"ru":["А) Личный товарооборот","Б) Общий оборот команды","В) Бонус"],"tk":["A) Şahsy tovar aýlanyşy","B) Topar aýlanyşy","C) Bonus"],"uz":["A) Shaxsiy tovar aylanmasi","B) Jamoa aylanmasi","V) Bonus"]},
+         "a":0,"e":{"ru":"ЛТО — Личный Товарооборот.","tk":"ŞTA — Şahsy Tovar Aýlanyşy.","uz":"ShTA — Shaxsiy Tovar Aylanmasi."}},
+        {"q":{"ru":"Как называется первый уровень карьеры?","tk":"Ilkinji karýera derejesi?","uz":"Birinchi martaba darajasi?"},
+         "o":{"ru":["А) Директор","Б) Партнёр","В) Менеджер"],"tk":["A) Direktor","B) Hyzmatdaş","C) Menejer"],"uz":["A) Direktor","B) Hamkor","V) Menejer"]},
+         "a":1,"e":{"ru":"Первый уровень — Партнёр.","tk":"Birinji dereje — Hyzmatdaş.","uz":"Birinchi daraja — Hamkor."}},
+        {"q":{"ru":"Когда начисляются бонусы?","tk":"Bonuslar haçan hasaplanýar?","uz":"Bonuslar qachon hisoblanadi?"},
+         "o":{"ru":["А) Каждый день","Б) Раз в месяц","В) Раз в год"],"tk":["A) Her gün","B) Aýda bir gezek","C) Ýylda bir gezek"],"uz":["A) Har kuni","B) Oyda bir marta","V) Yilda bir marta"]},
+         "a":1,"e":{"ru":"Бонусы начисляются раз в месяц.","tk":"Bonuslar aýda bir gezek hasaplanýar.","uz":"Bonuslar oyda bir marta hisoblanadi."}},
+        {"q":{"ru":"Что такое реферальная ссылка?","tk":"Referral salgy näme?","uz":"Referal havola nima?"},
+         "o":{"ru":["А) Ссылка на сайт","Б) Личная ссылка для приглашения","В) Ссылка на каталог"],"tk":["A) Saýta salgy","B) Çagyrmak üçin şahsy salgy","C) Kataloga salgy"],"uz":["A) Saytga havola","B) Taklif uchun shaxsiy havola","V) Katalogga havola"]},
+         "a":1,"e":{"ru":"Реферальная ссылка — ваша личная ссылка для приглашения.","tk":"Referral salgy — çagyrmak üçin şahsy salgyňyz.","uz":"Referal havola — taklif uchun shaxsiy havolangiz."}},
+        {"q":{"ru":"Что такое структура в МЛМ?","tk":"MLM-de gurluş näme?","uz":"MLMda tuzilma nima?"},
+         "o":{"ru":["А) Склад","Б) Команда партнёров и их рефералы","В) Офис"],"tk":["A) Ammar","B) Hyzmatdaşlar we olaryň referallary","C) Ofis"],"uz":["A) Ombor","B) Hamkorlar va ularning referallari","V) Ofis"]},
+         "a":1,"e":{"ru":"Структура — команда партнёров и все их рефералы.","tk":"Gurluş — hyzmatdaşlar we olaryň referallary.","uz":"Tuzilma — hamkorlar va ularning referallari."}},
+        {"q":{"ru":"Сколько партнёров нужно для первого уровня?","tk":"Birinji dereje üçin näçe hyzmatdaş gerek?","uz":"Birinchi daraja uchun nechta hamkor kerak?"},
+         "o":{"ru":["А) 1","Б) 2","В) 5"],"tk":["A) 1","B) 2","C) 5"],"uz":["A) 1","B) 2","V) 5"]},
+         "a":1,"e":{"ru":"Для первого уровня нужно минимум 2 активных партнёра.","tk":"Birinji dereje üçin azyndan 2 işjeň hyzmatdaş.","uz":"Birinchi daraja uchun kamida 2 faol hamkor."}},
+        {"q":{"ru":"Что значит дублирование в бизнесе?","tk":"Biznesdäki köpeltmek näme?","uz":"Biznesda duplikatsiya nima?"},
+         "o":{"ru":["А) Копирование документов","Б) Обучение новых партнёров работать как вы","В) Два аккаунта"],"tk":["A) Resminamalary göçürmek","B) Täze hyzmatdaşlary öz ýaly işlemäge öwretmek","C) Iki hasap"],"uz":["A) Hujjatlarni nusxalash","B) Yangi hamkorlarni o'zingiz kabi ishlashga o'rgatish","V) Ikki hisob"]},
+         "a":1,"e":{"ru":"Дублирование — передача системы новым партнёрам.","tk":"Köpeltmek — ulgamy täze hyzmatdaşlara bermek.","uz":"Duplikatsiya — tizimni yangi hamkorlarga berish."}},
+        {"q":{"ru":"Когда лучше предлагать продукт?","tk":"Önümi haçan hödürlemek gowy?","uz":"Mahsulotni qachon taklif qilish yaxshi?"},
+         "o":{"ru":["А) Сразу","Б) После прогрева и выяснения потребности","В) Только по телефону"],"tk":["A) Dessine","B) Gyzdyrylyandan we zerurlygy anyklap","C) Diňe telefonda"],"uz":["A) Darhol","B) Isitish va ehtiyojni bilib","V) Faqat telefonda"]},
+         "a":1,"e":{"ru":"Сначала прогрев — знакомство, выяснение потребности.","tk":"Öňürti gyzdyrmak — tanyşmak, zerurlygy anyklamak.","uz":"Avval isitish — tanishish, ehtiyojni bilish."}},
+        {"q":{"ru":"Что такое пассивный доход?","tk":"Passif girdeji näme?","uz":"Passiv daromad nima?"},
+         "o":{"ru":["А) Только личные продажи","Б) Доход от продаж всей структуры","В) Зарплата"],"tk":["A) Diňe şahsy satuw","B) Tutuş gurluşyň satuwyndan girdeji","C) Aýlyk"],"uz":["A) Faqat shaxsiy sotish","B) Butun tuzilma sotuvidan daromad","V) Maosh"]},
+         "a":1,"e":{"ru":"Пассивный доход — процент от продаж всей структуры.","tk":"Passif girdeji — tutuş gurluşyňyzyň satuwyndan göterim.","uz":"Passiv daromad — butun tuzilmangiz sotuvidan foiz."}},
+        {"q":{"ru":"Зачем партнёру изучать продукты?","tk":"Hyzmatdaş näme üçin önümleri öwrenmeli?","uz":"Hamkor nima uchun mahsulotlarni o'rganishi kerak?"},
+         "o":{"ru":["А) Не нужно","Б) Уверенно рекомендовать","В) Для экзамена"],"tk":["A) Gerek däl","B) Ynamly maslahat bermek","C) Ekzamen üçin"],"uz":["A) Kerak emas","B) Ishonch bilan tavsiya etish","V) Imtihon uchun"]},
+         "a":1,"e":{"ru":"Знание продуктов даёт уверенность при рекомендации.","tk":"Önüm bilimleri ynamlylygy artdyrýar.","uz":"Mahsulot bilimi ishonch beradi."}},
+        {"q":{"ru":"Что важно при работе с клиентом?","tk":"Müşderi bilen işlemekde näme möhüm?","uz":"Mijoz bilan ishlashda nima muhim?"},
+         "o":{"ru":["А) Продать любой ценой","Б) Выяснить потребность и предложить решение","В) Говорить без остановки"],"tk":["A) Islendik bahadan satmak","B) Zerurlygy anyklamak we çözgüt hödürlemek","C) Durmadan gepleşmek"],"uz":["A) Istalgan narxda sotish","B) Ehtiyojni bilib, yechim taklif qilish","V) To'xtamasdan gapirish"]},
+         "a":1,"e":{"ru":"Главное — выяснить потребность и предложить подходящее решение.","tk":"Iň möhüm — zerurlygy anyklamak we laýyk çözgüt hödürlemek.","uz":"Asosiysi — ehtiyojni bilib, mos yechim taklif qilish."}},
+        {"q":{"ru":"Что такое тёплый рынок?","tk":"Ýyly bazar näme?","uz":"Issiq bozor nima?"},
+         "o":{"ru":["А) Незнакомые люди","Б) Знакомые, друзья, родственники","В) Клиенты из интернета"],"tk":["A) Tanyş däl adamlar","B) Tanyşlar, dostlar, garyndaşlar","C) Internet müşderileri"],"uz":["A) Notanish odamlar","B) Tanishlar, do'stlar, qarindoshlar","V) Internet mijozlari"]},
+         "a":1,"e":{"ru":"Тёплый рынок — знакомые, друзья и родственники.","tk":"Ýyly bazar — tanyşlar, dostlar we garyndaşlar.","uz":"Issiq bozor — tanishlar, do'stlar va qarindoshlar."}},
+        {"q":{"ru":"Как правильно начать разговор о бизнесе?","tk":"Iş barada söhbetdeşligi nädip başlamaly?","uz":"Biznes haqida suhbatni qanday boshlash kerak?"},
+         "o":{"ru":["А) Сразу предложить стать партнёром","Б) Поинтересоваться жизнью и целями человека","В) Показать каталог"],"tk":["A) Dessine hyzmatdaş bolmagy teklip etmek","B) Adamyň durmuşy we maksatlary bilen gyzyklanmak","C) Katalogy görkezmek"],"uz":["A) Darhol hamkor bo'lishni taklif qilish","B) Odamning hayoti va maqsadlari bilan qiziqish","V) Katalogni ko'rsatish"]},
+         "a":1,"e":{"ru":"Начните с вопросов о человеке — его жизни и целях.","tk":"Adamyň durmuşy we maksatlary barada sorag bilen başlaň.","uz":"Odamning hayoti va maqsadlari haqida savol bilan boshlang."}},
+        {"q":{"ru":"Зачем нужен дневник партнёра?","tk":"Hyzmatdaşyň gündeligi näme üçin?","uz":"Hamkor kundaligi nima uchun?"},
+         "o":{"ru":["А) Для красоты","Б) Фиксировать действия и отслеживать прогресс","В) Обязательный документ"],"tk":["A) Gözellik üçin","B) Hereketleri belläp ösüşi yzarlamak","C) Hökmany resminamadyr"],"uz":["A) Ko'rinish uchun","B) Harakatlarni yozib rivojlanishni kuzatish","V) Majburiy hujjat"]},
+         "a":1,"e":{"ru":"Дневник помогает видеть результаты и анализировать действия.","tk":"Gündelik netijeleri görüp hereketleri seljerip biler.","uz":"Kundalik natijalarni ko'rish va harakatlarni tahlil qilishga yordam beradi."}},
+        {"q":{"ru":"Сколько новых контактов нужно в день активному партнёру?","tk":"Işjeň hyzmatdaşa günde näçe täze aragatnaşyk gerek?","uz":"Faol hamkorga kuniga nechta yangi aloqa kerak?"},
+         "o":{"ru":["А) 0","Б) Минимум 2-3","В) 100"],"tk":["A) 0","B) Azyndan 2-3","C) 100"],"uz":["A) 0","B) Kamida 2-3","V) 100"]},
+         "a":1,"e":{"ru":"Активный партнёр делает минимум 2-3 новых контакта в день.","tk":"Işjeň hyzmatdaş günde azyndan 2-3 täze aragatnaşyk edýär.","uz":"Faol hamkor kuniga kamida 2-3 yangi aloqa qiladi."}},
+        {"q":{"ru":"Что такое личный бренд партнёра?","tk":"Hyzmatdaşyň şahsy brendy näme?","uz":"Hamkorning shaxsiy brendi nima?"},
+         "o":{"ru":["А) Логотип","Б) Репутация и образ в глазах окружающих","В) Сайт"],"tk":["A) Logotip","B) Daş-töwerekdäkileriň gözünde abraý we keşp","C) Saýt"],"uz":["A) Logotip","B) Atrofdagilar ko'zida obro' va tasvir","V) Sayt"]},
+         "a":1,"e":{"ru":"Личный бренд — ваша репутация и образ в глазах окружающих.","tk":"Şahsy brend — daş-töwerekdäkileriň gözünde abraýyňyz.","uz":"Shaxsiy brend — atrofdagilar ko'zidagi obro'ingiz."}},
+        {"q":{"ru":"Чем отличается Vertera от обычных компаний?","tk":"Vertera adaty kompaniýalardan nähili tapawutlanýar?","uz":"Vertera oddiy kompaniyalardan nimasi bilan farq qiladi?"},
+         "o":{"ru":["А) Ничем","Б) Натуральные продукты + возможность дохода","В) Только ценой"],"tk":["A) Hiç zat bilen","B) Tebigy önümler + girdeji mümkinçiligi","C) Diňe bahasy bilen"],"uz":["A) Hech narsa","B) Tabiiy mahsulotlar + daromad imkoniyati","V) Faqat narxi bilan"]},
+         "a":1,"e":{"ru":"Vertera — натуральные продукты и реальная возможность дохода.","tk":"Vertera — tebigy önümler we girdeji mümkinçiligi.","uz":"Vertera — tabiiy mahsulotlar va real daromad imkoniyati."}}
     ],
 }
 
@@ -2690,39 +2715,39 @@ LEARN_FULL = {
     ),
 }
 
-# ─── Скрипты продаж ────────────────────────────────────────────
+# ─── Скрипты продаж ───────────────────────────────────────────
 _SCRPTS = {
     "vertera_gel": {
-        "name": {"ru": "🟢 Vertera Gel", "tk": "🟢 Vertera Gel", "uz": "🟢 Vertera Gel"},
-        "ru": ["Привет! Как ты? 😊 Давно не общались — чем сейчас занимаешься?",
-               "Понял(а)! Кстати, ты следишь за здоровьем — принимаешь что-нибудь для иммунитета?",
-               "Интересно! Я пробую натуральные продукты из морских водорослей — результат удивил. Встретимся на 15 мин? 🌿"],
-        "tk": ["Salam! Nähili? 😊", "Saglyga üns berýärmiň?", "Deňiz ösümliklerinden önüm synap görýärin. Duşuşarys — 15 minut? 🌿"],
-        "uz": ["Salom! Qanday? 😊", "Sog'lig'ingizga e'tibor berasizmi?", "Dengiz o'tlaridan mahsulot sinab ko'ryapman. Uchrashamiz — 15 daqiqa? 🌿"],
+        "name": {"ru":"🟢 Vertera Gel","tk":"🟢 Vertera Gel","uz":"🟢 Vertera Gel"},
+        "ru": ["Привет! Как ты? 😊 Давно не общались — чем занимаешься?",
+               "Понял(а)! Кстати, следишь за здоровьем — принимаешь что-нибудь для иммунитета?",
+               "Интересно! Я пробую продукты из морских водорослей — результат удивил. Встретимся на 15 мин? 🌿"],
+        "tk": ["Salam! Nähili? 😊","Saglyga üns berýärmiň?","Deňiz ösümliklerinden önüm synap görýärin. Duşuşarys? 🌿"],
+        "uz": ["Salom! Qanday? 😊","Sog'lig'ingizga e'tibor berasizmi?","Dengiz o'tlaridan mahsulot sinab ko'ryapman. Uchrashamiz? 🌿"],
     },
     "angiolive": {
-        "name": {"ru": "💜 AngioLive", "tk": "💜 AngioLive", "uz": "💜 AngioLive"},
-        "ru": ["Привет! Как дела? 😊", "У тебя или близких бывает усталость ног, отёки?", "Я узнал(а) о натуральном продукте для сосудов. Встретимся — расскажу, 15 мин 💜"],
-        "tk": ["Salam! 😊", "Aýaklaryň ýadamagy bolýarmy?", "Damarlar üçin tebigy önüm bar. Duşuşarys — 15 minut 💜"],
-        "uz": ["Salom! 😊", "Oyoqlar charchaqligi bo'ladimi?", "Tomir uchun tabiiy mahsulot bor. Uchrashamiz — 15 daqiqa 💜"],
+        "name": {"ru":"💜 AngioLive","tk":"💜 AngioLive","uz":"💜 AngioLive"},
+        "ru": ["Привет! Как дела? 😊","У тебя или близких бывает усталость ног, отёки?","Я узнал(а) о натуральном продукте для сосудов. Встретимся? 💜"],
+        "tk": ["Salam! 😊","Aýaklaryň ýadamagy bolýarmy?","Damarlar üçin tebigy önüm bar. Duşuşarys? 💜"],
+        "uz": ["Salom! 😊","Oyoqlar charchaqligi bo'ladimi?","Tomir uchun tabiiy mahsulot bor. Uchrashamiz? 💜"],
     },
     "collagen": {
-        "name": {"ru": "✨ Коллаген + Hydrate", "tk": "✨ Kollagen", "uz": "✨ Kollagen"},
-        "ru": ["Привет! Как дела? 😊", "Ты за кожей ухаживаешь — кремы, маски используешь?", "Я пробую натуральный коллаген — эффект реальный. Встретимся? ✨"],
-        "tk": ["Salam! 😊", "Derä ideg edýärmiň?", "Tebigy kollagen synap görýärin. Duşuşarys? ✨"],
-        "uz": ["Salom! 😊", "Teringizga g'amxo'rlik qilasizmi?", "Tabiiy kollagen sinab ko'ryapman. Uchrashamiz? ✨"],
+        "name": {"ru":"✨ Коллаген","tk":"✨ Kollagen","uz":"✨ Kollagen"},
+        "ru": ["Привет! Как дела? 😊","Ты за кожей ухаживаешь?","Пробую натуральный коллаген — эффект реальный. Встретимся? ✨"],
+        "tk": ["Salam! 😊","Derä ideg edýärmiň?","Tebigy kollagen synap görýärin. Duşuşarys? ✨"],
+        "uz": ["Salom! 😊","Teringizga g'amxo'rlik qilasizmi?","Tabiiy kollagen sinab ko'ryapman. Uchrashamiz? ✨"],
     },
     "business": {
-        "name": {"ru": "💼 Бизнес Vertera", "tk": "💼 Vertera biznesi", "uz": "💼 Vertera biznesi"},
-        "ru": ["Привет! Как работа? 😊", "Ты открыт(а) для новых возможностей дохода?", "Я начал(а) сотрудничество с международной компанией — натуральные продукты. Встретимся на 20 мин? 🌿"],
-        "tk": ["Salam! Iş nähili? 😊", "Täze girdeji mümkinçiliklerine açykmy?", "Halkara kompaniýa bilen hyzmatdaşlyk edýärin. Duşuşarys — 20 minut? 🌿"],
-        "uz": ["Salom! Ish qanday? 😊", "Yangi daromad imkoniyatlariga ochmisiz?", "Xalqaro kompaniya bilan hamkorlik boshladim. Uchrashamiz — 20 daqiqa? 🌿"],
+        "name": {"ru":"💼 Бизнес Vertera","tk":"💼 Vertera biznesi","uz":"💼 Vertera biznesi"},
+        "ru": ["Привет! Как работа? 😊","Ты открыт(а) для новых возможностей дохода?","Я начал(а) сотрудничество с международной компанией. Встретимся на 20 мин? 🌿"],
+        "tk": ["Salam! Iş nähili? 😊","Täze girdeji mümkinçiliklerine açykmy?","Halkara kompaniýa bilen hyzmatdaşlyk edýärin. Duşuşarys? 🌿"],
+        "uz": ["Salom! Ish qanday? 😊","Yangi daromad imkoniyatlariga ochmisiz?","Xalqaro kompaniya bilan hamkorlik boshladim. Uchrashamiz? 🌿"],
     },
     "seahoney": {
-        "name": {"ru": "🍯 Sea Honey", "tk": "🍯 Sea Honey", "uz": "🍯 Sea Honey"},
-        "ru": ["Привет! Что нового? 😊", "Ты интересуешься здоровым питанием?", "Я попробовал(а) Sea Honey — морские водоросли + мёд + прополис. Вкусно и для иммунитета хорошо. Встретимся? 🍯"],
-        "tk": ["Salam! 😊", "Sagdyn iýmit bilen gyzyklanýarsyňmy?", "Sea Honey synap gördüm — lezzetli we immunitete gowy. Duşuşarys? 🍯"],
-        "uz": ["Salom! 😊", "Sog'lom ovqatlanish bilan qiziqasizmi?", "Sea Honey sinab ko'rdim — mazali va immunitetga yaxshi. Uchrashamiz? 🍯"],
+        "name": {"ru":"🍯 Sea Honey","tk":"🍯 Sea Honey","uz":"🍯 Sea Honey"},
+        "ru": ["Привет! Что нового? 😊","Ты интересуешься здоровым питанием?","Попробовал(а) Sea Honey — водоросли + мёд + прополис. Вкусно и полезно. Встретимся? 🍯"],
+        "tk": ["Salam! 😊","Sagdyn iýmit bilen gyzyklanýarsyňmy?","Sea Honey synap gördüm — lezzetli we peýdaly. Duşuşarys? 🍯"],
+        "uz": ["Salom! 😊","Sog'lom ovqatlanish bilan qiziqasizmi?","Sea Honey sinab ko'rdim — mazali va foydali. Uchrashamiz? 🍯"],
     },
 }
 
@@ -2733,6 +2758,39 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     user = update.effective_user
     text = update.message.text
     p    = PT.get(lang, PT["ru"])
+
+    # Обработка ДР для существующего партнёра
+    if context.user_data.get("bday_for_partner"):
+        skip_options = ["⏭ Пропустить", "⏭ Geçir", "⏭ O'tkazish"]
+        if text not in skip_options:
+            # Сохраняем ДР
+            users_d = _jload(_USERS_F)
+            uid_str = str(user.id)
+            if uid_str in users_d:
+                users_d[uid_str]["birthday"] = text.strip()
+                _jsave(_USERS_F, users_d)
+            # Сохраняем в Sheets
+            try:
+                async with httpx.AsyncClient(follow_redirects=True) as _hc:
+                    await _hc.post(GOOGLE_SHEET_URL, json={
+                        "type": "update_birthday",
+                        "user_id": uid_str,
+                        "birthday": text.strip(),
+                    }, timeout=10)
+            except Exception as e:
+                logger.error(f"bday save: {e}")
+            saved = {"ru": "✅ Дата рождения сохранена! 🎂", "tk": "✅ Doglan gün ýazyldy! 🎂", "uz": "✅ Tug'ilgan kun saqlandi! 🎂"}
+            await update.message.reply_text(saved.get(lang, saved["ru"]))
+        context.user_data.pop("bday_for_partner", None)
+        pname = _jload(_PARTNERS_F).get(str(user.id), {}).get("name", "")
+        fname = pname.strip().split()[0] if pname.strip() else ""
+        greet = {
+            "ru": "🌿 *Dream Team Vertera*\n\n" + (f"Привет, {fname}! " if fname else "Привет! ") + "Добро пожаловать! 🤝",
+            "tk": "🌿 *Dream Team Vertera*\n\n" + (f"Salam, {fname}! " if fname else "Salam! ") + "Hoş geldiňiz 🤝",
+            "uz": "🌿 *Dream Team Vertera*\n\n" + (f"Salom, {fname}! " if fname else "Salom! ") + "Xush kelibsiz 🤝",
+        }
+        await update.message.reply_text(greet.get(lang, greet["ru"]), parse_mode="Markdown", reply_markup=get_partner_kb(lang))
+        return PARTNER_MENU
 
     # Выход
     if text == p["btn_back"]:
@@ -2772,15 +2830,56 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             kb = ReplyKeyboardMarkup([[review_btn],[p["btn_back"]]],resize_keyboard=True)
             await update.message.reply_text(DAYS_ALL_DONE.get(lang, DAYS_ALL_DONE["ru"]), reply_markup=kb)
             return PARTNER_MENU
+        # Проверяем блокировку по дате
+        if day > 1 and not learn_can_open(user.id, day):
+            prev = learn_date_get(user.id, day - 1)
+            if prev:
+                unlock = (_dt_mod.date.fromisoformat(prev) + _dt_mod.timedelta(days=1)).strftime("%d.%m.%Y")
+            else:
+                unlock = "завтра"
+            locked = {
+                "ru": f"🔒 *День {day} пока недоступен*\n\n📅 Откроется: *{unlock}*\n\nПриходите завтра — продолжим! 🌿",
+                "tk": f"🔒 *{day}-nji gün entek elýeterli däl*\n\n📅 Açylyş: *{unlock}*\n\nErtir gaidiň! 🌿",
+                "uz": f"🔒 *{day}-kun hozircha mavjud emas*\n\n📅 Ochilish: *{unlock}*\n\nErtaga keling! 🌿",
+            }
+            await update.message.reply_text(locked.get(lang, locked["ru"]), parse_mode="Markdown", reply_markup=get_partner_kb(lang))
+            return PARTNER_MENU
+        # Фиксируем дату первого открытия
+        if not learn_date_get(user.id, day):
+            learn_date_set(user.id, day)
         day_text = DAYS[day].get(lang, DAYS[day]["ru"])
         done_btn = DAYS_DONE_BTN.get(lang, DAYS_DONE_BTN["ru"])
         repeat_btn = DAYS_REPEAT_BTN.get(lang, DAYS_REPEAT_BTN["ru"])
         learn_kb = ReplyKeyboardMarkup(
-            [[done_btn], [p["btn_webinar"]], [repeat_btn], [p["btn_back"]]],
+            [[done_btn], [repeat_btn], [p["btn_back"]]],
             resize_keyboard=True
         )
         await send_slot_video(context.bot, user.id, f"learn_day_{day}", lang)
         await update.message.reply_text(day_text, parse_mode="Markdown", reply_markup=learn_kb)
+        return PARTNER_MENU
+
+    # Дневник: сохранить или пропустить
+    skip_btns   = ["⏭ Пропустить", "⏭ Geçir", "⏭ O'tkazish"]
+    diary_state = context.user_data.get("waiting_diary")
+    if diary_state:
+        dtype = diary_state.get("type", "learn")
+        dday  = diary_state.get("day", 0)
+        uname_d = f"@{user.username}" if user.username else str(user.id)
+        if text not in skip_btns:
+            # Сохраняем запись
+            try:
+                async with httpx.AsyncClient(follow_redirects=True) as _hc:
+                    await _hc.post(GOOGLE_SHEET_URL, json={
+                        "type": "diary", "user_id": str(user.id),
+                        "name": user.full_name or uname_d, "username": uname_d,
+                        "dtype": dtype, "day": dday, "text": text, "lang": lang,
+                    }, timeout=10)
+            except Exception as e:
+                logger.error(f"diary: {e}")
+            saved = {"ru": "✅ Запись в дневнике сохранена! 🌿", "tk": "✅ Gündelik ýazgýsy saklandy! 🌿", "uz": "✅ Kundalik yozuvi saqlandi! 🌿"}
+            await update.message.reply_text(saved.get(lang, saved["ru"]))
+        context.user_data.pop("waiting_diary", None)
+        await update.message.reply_text(p["menu_title"], reply_markup=get_partner_kb(lang))
         return PARTNER_MENU
 
     # Кнопка "Задание выполнено"
@@ -2792,35 +2891,51 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             await progress_sync_to_sheets(user.id, 8, user.full_name or "", f"@{user.username}" if user.username else str(user.id))
             await update.message.reply_text(DAYS_ALL_DONE.get(lang, DAYS_ALL_DONE["ru"]), reply_markup=get_partner_kb(lang))
             return PARTNER_MENU
+        # Фиксируем дату закрытия дня
+        learn_date_set(user.id, day)
         new_day = day + 1
         progress_set(user.id, new_day)
         await progress_sync_to_sheets(user.id, new_day, user.full_name or "", f"@{user.username}" if user.username else str(user.id))
-        # Уведомляем менеджера
         uname = f"@{user.username}" if user.username else str(user.id)
         try:
             await context.bot.send_message(
                 chat_id=MANAGER_CHAT_ID,
-                text=f"✅ Партнёр завершил День {day}\n\n👤 {user.full_name or uname}\n🆔 {uname}\n➡️ Переходит к Дню {new_day}"
+                text=f"✅ Партнёр завершил День {day}\n👤 {user.full_name or uname} / {uname}\n📅 День {new_day} откроется завтра"
             )
         except Exception as e:
             logger.error(f"progress notify: {e}")
-        if new_day > 7:
-            await update.message.reply_text(DAYS_ALL_DONE.get(lang, DAYS_ALL_DONE["ru"]), reply_markup=get_partner_kb(lang))
-        else:
-            day_text = DAYS[new_day].get(lang, DAYS[new_day]["ru"])
-            done_btn = DAYS_DONE_BTN.get(lang, DAYS_DONE_BTN["ru"])
-            repeat_btn = DAYS_REPEAT_BTN.get(lang, DAYS_REPEAT_BTN["ru"])
-            learn_kb = ReplyKeyboardMarkup(
-                [[done_btn], [p["btn_webinar"]], [repeat_btn], [p["btn_back"]]],
-                resize_keyboard=True
-            )
-            congrats = {
-                "ru": f"🎉 День {day} пройден! Открывается День {new_day}:",
-                "tk": f"🎉 {day}-nji gün geçildi! {new_day}-nji gün açylýar:",
-                "uz": f"🎉 {day}-kun o'tildi! {new_day}-kun ochilmoqda:",
-            }
-            await update.message.reply_text(congrats.get(lang, congrats["ru"]), reply_markup=learn_kb)
-            await update.message.reply_text(day_text, parse_mode="Markdown", reply_markup=learn_kb)
+        # Уведомление + предложение дневника
+        tomorrow_msg = {
+            "ru": (
+                f"🎉 *День {day} завершён!*\n\n"
+                "⏰ У вас есть один день чтобы выполнить все задания.\n"
+                f"📅 *День {new_day} откроется завтра.*\n\n"
+                "✍️ *Дневник партнёра:*\nНапишите что вы сделали из заданий сегодня, "
+                "или нажмите «Пропустить»."
+            ),
+            "tk": (
+                f"🎉 *{day}-nji gün tamamlandy!*\n\n"
+                "⏰ Tabşyryklary ýerine ýetirmek üçin bir günüňiz bar.\n"
+                f"📅 *{new_day}-nji gün ertir açylar.*\n\n"
+                "✍️ Bu gün nämeler etdiňizi ýazyň, ýa-da «Geçir»."
+            ),
+            "uz": (
+                f"🎉 *{day}-kun yakunlandi!*\n\n"
+                "⏰ Topshiriqlarni bajarish uchun bir kuningiz bor.\n"
+                f"📅 *{new_day}-kun ertaga ochiladi.*\n\n"
+                "✍️ Bugun nima qilganingizni yozing, yoki «O'tkazish»."
+            ),
+        }
+        skip_kb = ReplyKeyboardMarkup(
+            [[skip_btns[0] if lang == "ru" else (skip_btns[1] if lang == "tk" else skip_btns[2])]],
+            resize_keyboard=True
+        )
+        context.user_data["waiting_diary"] = {"type": "learn", "day": day}
+        await update.message.reply_text(
+            tomorrow_msg.get(lang, tomorrow_msg["ru"]),
+            parse_mode="Markdown",
+            reply_markup=skip_kb
+        )
         return PARTNER_MENU
 
     # Кнопка "Повторить задание дня"
@@ -2878,17 +2993,31 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         await mkt_progress_sync(user.id, new_day, user.full_name or "", uname)
         try:
             await context.bot.send_message(chat_id=MANAGER_CHAT_ID,
-                text=f"📊 Партнёр прошёл маркетинг День {day}\n👤 {user.full_name or uname}\n🆔 {uname}")
+                text=f"📊 Партнёр прошёл маркетинг День {day}\n👤 {user.full_name or uname} / {uname}\n📅 День {new_day} откроется завтра")
         except Exception as e:
             logger.error(f"mkt notify: {e}")
         if new_day > 7:
-            kb = ReplyKeyboardMarkup([[p.get("btn_review_mkt","📖 Просмотреть маркетинг")],[p["btn_back"]]],resize_keyboard=True)
-            await update.message.reply_text(MKT_ALL_DONE.get(lang,MKT_ALL_DONE["ru"]),reply_markup=kb)
+            await update.message.reply_text(MKT_ALL_DONE.get(lang,MKT_ALL_DONE["ru"]), reply_markup=get_partner_kb(lang))
         else:
-            mkt_kb = ReplyKeyboardMarkup([[MKT_DONE_BTN.get(lang,MKT_DONE_BTN["ru"])],[MKT_REPEAT_BTN.get(lang,MKT_REPEAT_BTN["ru"])],[p["btn_back"]]],resize_keyboard=True)
-            ctext = {"ru":f"🎉 День {day} пройден! Открывается День {new_day}:","tk":f"🎉 {day}-nji gün geçildi! {new_day}-nji gün:","uz":f"🎉 {day}-kun o'tildi! {new_day}-kun:"}
-            await update.message.reply_text(ctext.get(lang,ctext["ru"]),reply_markup=mkt_kb)
-            await update.message.reply_text(MKT_DAYS[new_day].get(lang,MKT_DAYS[new_day]["ru"]),parse_mode="Markdown",reply_markup=mkt_kb)
+            mkt_tom = {
+                "ru": (f"🎉 *Маркетинг день {day} завершён!*\n\n"
+                       "⏰ У вас есть один день чтобы применить знания.\n"
+                       f"📅 *День {new_day} откроется завтра.*\n\n"
+                       "✍️ Напишите что вы сделали сегодня, или «Пропустить»."),
+                "tk": (f"🎉 *Marketing {day}-nji güni tamamlandy!*\n\n"
+                       f"📅 *{new_day}-nji gün ertir açylar.*\n\n"
+                       "✍️ Bu gün nämeler etdiňizi ýazyň, ýa-da «Geçir»."),
+                "uz": (f"🎉 *Marketing {day}-kun yakunlandi!*\n\n"
+                       f"📅 *{new_day}-kun ertaga ochiladi.*\n\n"
+                       "✍️ Bugun nima qilganingizni yozing, yoki «O'tkazish»."),
+            }
+            skip_m = {"ru": "⏭ Пропустить", "tk": "⏭ Geçir", "uz": "⏭ O'tkazish"}
+            context.user_data["waiting_diary"] = {"type": "mkt", "day": day}
+            await update.message.reply_text(
+                mkt_tom.get(lang, mkt_tom["ru"]),
+                parse_mode="Markdown",
+                reply_markup=ReplyKeyboardMarkup([[skip_m.get(lang, skip_m["ru"])]], resize_keyboard=True)
+            )
         return PARTNER_MENU
 
     # Кнопка "Повторить день маркетинга"
@@ -2989,7 +3118,7 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
                 import random
                 qs = QUIZ_DATA[qkey].copy()
                 random.shuffle(qs)
-                qs = qs[:10]  # максимум 10 вопросов
+                qs = qs[:7]   # 7 из 30+ банка
                 context.user_data["quiz_qs"]    = qs
                 context.user_data["quiz_q"]     = 0
                 context.user_data["quiz_score"]  = 0
@@ -3070,118 +3199,61 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         return PARTNER_MENU
 
 
-    # ── Кнопка "Меню партнёра" из подменю ──────────────────────
-    all_pm_btns = [PT[l].get("btn_partner_menu","") for l in PT]
-    if text in all_pm_btns:
-        context.user_data.pop("in_scripts", None)
-        context.user_data.pop("script_step", None)
-        context.user_data.pop("script_key", None)
-        context.user_data.pop("waiting_wish", None)
+    # ── Кнопка возврата в меню партнёра ────────────────────────
+    all_pm = [PT[l].get("btn_partner_menu","") for l in PT if "btn_partner_menu" in PT[l]]
+    if text in all_pm:
+        for k in ["in_scripts","script_step","script_key","waiting_diary","bday_for_partner"]:
+            context.user_data.pop(k, None)
         await update.message.reply_text(p["menu_title"], reply_markup=get_partner_kb(lang))
         return PARTNER_MENU
 
-    # ── Реферальная ссылка ─────────────────────────────────────
-    all_ref_btns = [PT[l].get("btn_reflink","") for l in PT]
-    if text in all_ref_btns:
-        link = f"https://t.me/{BOT_USERNAME}?start=ref{user.id}"
-        cnt  = ref_count(user.id)
-        msg_texts = {
-            "ru": (f"🔗 *Ваша реферальная ссылка:*\n\n`{link}`\n\nОтправьте знакомым — когда они зарегистрируются, вы увидите их в «👥 Моя команда».\n\n👥 Приглашено: *{cnt}* чел."),
-            "tk": (f"🔗 *Siziň referral salgyňyz:*\n\n`{link}`\n\nTanşlaryňyza iberiň — hasaba alynanda «👥 Meniň toparymy»-da görersiňiz.\n\n👥 Çagyryşlar: *{cnt}* adam"),
-            "uz": (f"🔗 *Sizning referal havolangiz:*\n\n`{link}`\n\nTanishlaringizga yuboring — ro'yxatdan o'tganda «👥 Mening jamoam»da ko'rasiz.\n\n👥 Taklif qilganlar: *{cnt}* kishi"),
-        }
-        ikb = InlineKeyboardMarkup([[InlineKeyboardButton({"ru":"🔗 Открыть","tk":"🔗 Açmak","uz":"🔗 Ochish"}.get(lang,"🔗"), url=link)]])
-        await update.message.reply_text(msg_texts.get(lang, msg_texts["ru"]), parse_mode="Markdown", reply_markup=ikb)
-        return PARTNER_MENU
-
-    # ── Моя команда (с загрузкой из Sheets) ───────────────────
-    all_team_btns = [PT[l].get("btn_team","") for l in PT]
-    if text in all_team_btns:
-        # Всегда подгружаем из Sheets
-        try:
-            await refs_load_from_sheets()
-        except Exception:
-            pass
-        refs = ref_get(user.id)
-        if not refs:
-            no_team = {
-                "ru": "👥 *Моя команда*\n\nПока никого нет.\n\nПоделитесь реферальной ссылкой — нажмите «🔗 Моя реферальная ссылка» 🌿",
-                "tk": "👥 *Meniň toparymy*\n\nHäzirlikçe hiç kim ýok.\n\nReferral salgyňyzy paýlaşyň 🌿",
-                "uz": "👥 *Mening jamoam*\n\nHali hech kim yo'q.\n\nReferal havolangizni ulashing 🌿",
-            }
-            await update.message.reply_text(no_team.get(lang, no_team["ru"]), parse_mode="Markdown", reply_markup=get_partner_kb(lang))
-        else:
-            lns = []
-            for i, r in enumerate(refs, 1):
-                uid_r  = r.get("uid","")
-                name_r = r.get("name","—")
-                d_learn = progress_get(int(uid_r)) if uid_r else 0
-                pm = "🤝" if (uid_r and is_partner(int(uid_r))) else "👤"
-                ls = {"ru": f"📚 д.{d_learn}/7" if d_learn else "📚 не начал",
-                      "tk": f"📚 {d_learn}/7 gün" if d_learn else "📚 başlamady",
-                      "uz": f"📚 {d_learn}/7 kun" if d_learn else "📚 boshlamagan"}
-                lns.append(f"{i}. {pm} {name_r} | {ls.get(lang, ls['ru'])}")
-            hdr = {"ru": f"👥 *Моя команда* — {len(refs)} чел.\n\n",
-                   "tk": f"👥 *Meniň toparymy* — {len(refs)} adam\n\n",
-                   "uz": f"👥 *Mening jamoam* — {len(refs)} kishi\n\n"}
-            tip = {"ru":"\n\n🤝 — партнёр | 👤 — пользователь","tk":"\n\n🤝 — hyzmatdaş | 👤 — ulanyjy","uz":"\n\n🤝 — hamkor | 👤 — foydalanuvchi"}
-            await update.message.reply_text(hdr.get(lang,hdr["ru"]) + "\n".join(lns) + tip.get(lang,tip["ru"]), parse_mode="Markdown", reply_markup=get_partner_kb(lang))
-        return PARTNER_MENU
-
     # ── Мои достижения ─────────────────────────────────────────
-    all_ach_btns = [PT[l].get("btn_achieve","") for l in PT]
-    if text in all_ach_btns:
+    all_ach = [PT[l].get("btn_achieve","") for l in PT if "btn_achieve" in PT[l]]
+    if text in all_ach:
         ld = progress_get(user.id); md = mkt_progress_get(user.id)
-        qz = quiz_get(user.id);     rc = ref_count(user.id); pa = is_partner(user.id)
+        qz = quiz_get(user.id)
+        pa = is_partner(user.id)
         def b(ok): return "✅" if ok else "⬜"
         lm = {
-            "ru": [f"{b(pa)} Стал партнёром Vertera", f"{b(ld>=7)} Завершил обучение (7 дней)",
-                   f"{b(md>=7)} Завершил маркетинг-план", f"{b(len(qz)>=3)} Прошёл все 3 теста",
-                   f"{b(rc>=1)} Пригласил 1 чел.", f"{b(rc>=3)} Пригласил 3 чел.",
-                   f"{b(rc>=5)} Пригласил 5 чел.", f"{b(rc>=10)} Пригласил 10 чел. 🔥"],
-            "tk": [f"{b(pa)} Vertera hyzmatdaşy", f"{b(ld>=7)} Okuw tamamlandy",
-                   f"{b(md>=7)} Marketing tamamlandy", f"{b(len(qz)>=3)} 3 test geçildi",
-                   f"{b(rc>=1)} 1 adam", f"{b(rc>=3)} 3 adam",
-                   f"{b(rc>=5)} 5 adam", f"{b(rc>=10)} 10 adam 🔥"],
-            "uz": [f"{b(pa)} Vertera hamkori", f"{b(ld>=7)} O'qitish tugadi",
-                   f"{b(md>=7)} Marketing tugadi", f"{b(len(qz)>=3)} 3 test o'tildi",
-                   f"{b(rc>=1)} 1 kishi", f"{b(rc>=3)} 3 kishi",
-                   f"{b(rc>=5)} 5 kishi", f"{b(rc>=10)} 10 kishi 🔥"],
+            "ru":[f"{b(pa)} Стал партнёром Vertera",f"{b(ld>=7)} Завершил обучение (7 дней)",
+                  f"{b(md>=7)} Завершил маркетинг-план",f"{b(len(qz)>=3)} Прошёл все тесты"],
+            "tk":[f"{b(pa)} Vertera hyzmatdaşy",f"{b(ld>=7)} Okuw tamamlandy",
+                  f"{b(md>=7)} Marketing tamamlandy",f"{b(len(qz)>=3)} Testler geçildi"],
+            "uz":[f"{b(pa)} Vertera hamkori",f"{b(ld>=7)} O'qitish tugadi",
+                  f"{b(md>=7)} Marketing tugadi",f"{b(len(qz)>=3)} Testlar o'tildi"],
         }
         ls = lm.get(lang, lm["ru"])
         done = sum(1 for l in ls if l.startswith("✅"))
-        hdr = {"ru": f"🏆 *Мои достижения* ({done}/{len(ls)})\n\n",
-               "tk": f"🏆 *Meniň üstünliklerim* ({done}/{len(ls)})\n\n",
-               "uz": f"🏆 *Mening yutuqlarim* ({done}/{len(ls)})\n\n"}
+        hdr = {"ru":f"🏆 *Мои достижения* ({done}/{len(ls)})\n\n",
+               "tk":f"🏆 *Meniň üstünliklerim* ({done}/{len(ls)})\n\n",
+               "uz":f"🏆 *Mening yutuqlarim* ({done}/{len(ls)})\n\n"}
         await update.message.reply_text(hdr.get(lang,hdr["ru"]) + "\n".join(ls), parse_mode="Markdown", reply_markup=get_partner_kb(lang))
         return PARTNER_MENU
 
     # ── Скрипты продаж ─────────────────────────────────────────
-    # (определяем SALES_SCRIPTS ниже - импорт из module-level dict)
-    NEXT_MSG = {"ru": "➡️ Следующее", "tk": "➡️ Indiki", "uz": "➡️ Keyingi"}
-    OTHER_PR  = {"ru": "🔄 Другой продукт", "tk": "🔄 Başga önüm", "uz": "🔄 Boshqa mahsulot"}
-    all_scr_btns = [PT[l].get("btn_scripts","") for l in PT]
+    NEXT  = {"ru":"➡️ Следующее","tk":"➡️ Indiki","uz":"➡️ Keyingi"}
+    OTHER = {"ru":"🔄 Другой продукт","tk":"🔄 Başga önüm","uz":"🔄 Boshqa mahsulot"}
+    all_scr = [PT[l].get("btn_scripts","") for l in PT if "btn_scripts" in PT[l]]
 
-    if context.user_data.get("script_step") is not None and text == NEXT_MSG.get(lang,""):
-        skey  = context.user_data.get("script_key","")
-        step  = context.user_data["script_step"]
+    if context.user_data.get("script_step") is not None and text == NEXT.get(lang,""):
+        skey = context.user_data.get("script_key","")
+        step = context.user_data["script_step"]
         if skey in _SCRPTS:
             steps = _SCRPTS[skey].get(lang, _SCRPTS[skey].get("ru",[]))
             if step < len(steps)-1:
                 context.user_data["script_step"] = step+1
                 nxt = steps[step+1]
                 is_last = (step+1 == len(steps)-1)
-                rows = [] if is_last else [[NEXT_MSG.get(lang,"")]]
-                rows += [[OTHER_PR.get(lang,"")], [p["btn_partner_menu"]]]
-                hdr = {"ru":f"💬 *Шаг {step+2}/3:*\n\n","tk":f"💬 *{step+2}/3 ädim:*\n\n","uz":f"💬 *{step+2}/3 qadam:*\n\n"}
-                await update.message.reply_text(hdr.get(lang,hdr["ru"]) + nxt + "\n\n📋 _Скопируйте и отправьте_", parse_mode="Markdown", reply_markup=ReplyKeyboardMarkup(rows, resize_keyboard=True))
+                rows = ([] if is_last else [[NEXT.get(lang,"")]]) + [[OTHER.get(lang,"")],[p["btn_partner_menu"]]]
+                hdr = {"ru":f"💬 *Шаг {step+2}/3:*\n\n","tk":f"💬 *{step+2}/3:*\n\n","uz":f"💬 *{step+2}/3:*\n\n"}
+                await update.message.reply_text(hdr.get(lang,hdr["ru"]) + nxt + "\n\n📋 _Скопируйте_", parse_mode="Markdown", reply_markup=ReplyKeyboardMarkup(rows, resize_keyboard=True))
         return PARTNER_MENU
 
-    if text == OTHER_PR.get(lang,""):
+    if text == OTHER.get(lang,""):
         context.user_data.pop("script_step",None); context.user_data.pop("script_key",None)
         context.user_data["in_scripts"] = True
 
-    if text in all_scr_btns or context.user_data.get("in_scripts"):
+    if text in all_scr or context.user_data.get("in_scripts"):
         context.user_data["in_scripts"] = True
         context.user_data.pop("script_step",None); context.user_data.pop("script_key",None)
         chosen = None
@@ -3193,10 +3265,9 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             context.user_data["script_key"] = chosen
             context.user_data["script_step"] = 0
             steps = _SCRPTS[chosen].get(lang, _SCRPTS[chosen].get("ru",[]))
-            rows = [[NEXT_MSG.get(lang,"")], [OTHER_PR.get(lang,"")], [p["btn_partner_menu"]]]
-            desc = {"ru":"📎 *Скрипт прогрева — 3 шага*\n","tk":"📎 *3 ädim skripti*\n","uz":"📎 *3 qadam skripti*\n"}
-            hdr  = {"ru":"💬 *Шаг 1/3:*\n\n","tk":"💬 *1/3:*\n\n","uz":"💬 *1/3:*\n\n"}
-            await update.message.reply_text(desc.get(lang,desc["ru"]) + hdr.get(lang,hdr["ru"]) + steps[0] + "\n\n📋 _Скопируйте и отправьте_", parse_mode="Markdown", reply_markup=ReplyKeyboardMarkup(rows, resize_keyboard=True))
+            rows = [[NEXT.get(lang,"")],[OTHER.get(lang,"")],[p["btn_partner_menu"]]]
+            hdr = {"ru":"💬 *Шаг 1/3:*\n\n","tk":"💬 *1/3:*\n\n","uz":"💬 *1/3:*\n\n"}
+            await update.message.reply_text("📎 *Скрипт прогрева — 3 шага*\n\n" + hdr.get(lang,hdr["ru"]) + steps[0] + "\n\n📋 _Скопируйте_", parse_mode="Markdown", reply_markup=ReplyKeyboardMarkup(rows, resize_keyboard=True))
         else:
             rows = [[sd.get("name",{}).get(lang, sd.get("name",{}).get("ru",""))] for sd in _SCRPTS.values()]
             rows.append([p["btn_partner_menu"]])
@@ -3205,38 +3276,30 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         return PARTNER_MENU
 
     # ── Пожелания ──────────────────────────────────────────────
-    all_wish_btns = [PT[l].get("btn_wishes","") for l in PT]
-    if text in all_wish_btns:
+    all_wish = [PT[l].get("btn_wishes","") for l in PT if "btn_wishes" in PT[l]]
+    if text in all_wish:
         context.user_data["waiting_wish"] = True
-        wish_prompt = {
-            "ru": "💌 *Пожелания команде*\n\nНапишите ваше пожелание, предложение или отзыв — мы обязательно прочитаем и ответим 🌿",
-            "tk": "💌 *Topar üçin islegler*\n\nIslegiňizi, teklibiňizi ýa-da synlaryňyzy ýazyň 🌿",
-            "uz": "💌 *Jamoa uchun takliflar*\n\nTaklifingiz, istagingiz yoki sharhingizni yozing 🌿",
-        }
-        await update.message.reply_text(wish_prompt.get(lang, wish_prompt["ru"]), parse_mode="Markdown",
+        wp = {"ru":"💌 *Пожелания*\n\nНапишите ваше пожелание — мы обязательно прочитаем 🌿",
+              "tk":"💌 *Islegler*\n\nIslegiňizi ýazyň 🌿","uz":"💌 *Takliflar*\n\nTaklifingizni yozing 🌿"}
+        await update.message.reply_text(wp.get(lang,wp["ru"]), parse_mode="Markdown",
             reply_markup=ReplyKeyboardMarkup([[p["btn_partner_menu"]]], resize_keyboard=True))
         return PARTNER_MENU
 
     if context.user_data.get("waiting_wish"):
         context.user_data.pop("waiting_wish", None)
-        uname = f"@{user.username}" if user.username else str(user.id)
-        wishes_add(user.id, user.full_name or uname, uname, text)
-        await wish_sync_to_sheets(user.id, user.full_name or uname, uname, text, lang)
-        # Уведомление менеджеру
+        uname_w = f"@{user.username}" if user.username else str(user.id)
         try:
-            await context.bot.send_message(
-                chat_id=MANAGER_CHAT_ID,
-                text=f"💌 *Новое пожелание от партнёра*\n\n👤 {user.full_name or uname}\n🆔 {uname}\n\n{text}",
-                parse_mode="Markdown"
-            )
+            async with httpx.AsyncClient(follow_redirects=True) as _hc:
+                await _hc.post(GOOGLE_SHEET_URL, json={"type":"wish","user_id":str(user.id),"name":user.full_name or uname_w,"username":uname_w,"text":text,"lang":lang}, timeout=10)
+        except Exception as e:
+            logger.error(f"wish: {e}")
+        try:
+            await context.bot.send_message(chat_id=MANAGER_CHAT_ID,
+                text=f"💌 *Пожелание от партнёра*\n\n👤 {user.full_name or uname_w}\n🆔 {uname_w}\n\n{text}", parse_mode="Markdown")
         except Exception as e:
             logger.error(f"wish notify: {e}")
-        thanks = {
-            "ru": "✅ Спасибо за ваше пожелание! Мы обязательно прочитаем 🌿",
-            "tk": "✅ Islegiňiz üçin sag boluň! 🌿",
-            "uz": "✅ Taklifingiz uchun rahmat! 🌿",
-        }
-        await update.message.reply_text(thanks.get(lang, thanks["ru"]), reply_markup=get_partner_kb(lang))
+        thanks = {"ru":"✅ Спасибо за пожелание! 🌿","tk":"✅ Sag boluň! 🌿","uz":"✅ Rahmat! 🌿"}
+        await update.message.reply_text(thanks.get(lang,thanks["ru"]), reply_markup=get_partner_kb(lang))
         return PARTNER_MENU
 
     # Любой другой текст — остаёмся в меню
@@ -3310,7 +3373,7 @@ async def partner_quiz_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             import random
             qs = QUIZ_DATA[qkey].copy()
             random.shuffle(qs)
-            qs = qs[:10]  # максимум 10 вопросов
+            qs = qs[:7]   # 7 из 30+ банка
             context.user_data["quiz_qs"]   = qs
             context.user_data["quiz_q"]    = 0
             context.user_data["quiz_score"] = 0
@@ -3400,55 +3463,17 @@ async def partner_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     info = pending_get(uid)
     if not info:
         await update.message.reply_text("Запрос не найден."); return
-    country = info.get("country", "TKM")
-    partner_add(uid, info.get("name",""), info.get("cid",""), info.get("lang","ru"), country)
+    partner_add(uid, info.get("name",""), info.get("cid",""), info.get("lang","ru"))
     pending_del(uid)
     lang  = info.get("lang","ru")
     uname = info.get("uname","")
     p     = PT.get(lang, PT["ru"])
-    pname = info.get("name","")
-    fname = pname.strip().split()[0] if pname.strip() else ""
     # Сохраняем в Google Sheets (постоянное хранение)
-    await partner_add_sheets(uid, info.get("name",""), info.get("cid",""), lang, uname, country=country)
+    await partner_add_sheets(uid, info.get("name",""), info.get("cid",""), lang, uname)
     try:
         await send_slot_video(context.bot, uid, "partner_ok", lang)
-        approved_text = {
-            "ru": (
-                "🌿 *Dream Team Vertera*\n\n"
-                + (f"🎉 {pname}, поздравляем! " if pname else "🎉 Поздравляем! ")
-                + "Вы одобрены как официальный партнёр Vertera!\n\n"
-                "Добро пожаловать в команду Dream Team 🤝\n\n"
-                "Теперь вам доступно:\n"
-                "📚 Обучение для новичков (7 дней)\n"
-                "📊 Маркетинг-план (7 дней)\n"
-                "🧪 Тесты и 🔗 Реферальная ссылка\n\n"
-                "Начните с «📚 Обучение для новичков» 👇"
-            ),
-            "tk": (
-                "🌿 *Dream Team Vertera*\n\n"
-                + (f"🎉 {pname}, gutlaýarys! " if pname else "🎉 Gutlaýarys! ")
-                + "Siz resmi Vertera hyzmatdaşy hökmünde tassyklandyňyz!\n\n"
-                "Dream Team toparyna hoş geldiňiz 🤝\n\n"
-                "Indi size elýeterli:\n"
-                "📚 Täze başlanlar üçin okuw (7 gün)\n"
-                "📊 Marketing meýilnamasy\n\n"
-                "«📚 Täze başlanlar üçin okuw» bölümden başlaň 👇"
-            ),
-            "uz": (
-                "🌿 *Dream Team Vertera*\n\n"
-                + (f"🎉 {pname}, tabriklaymiz! " if pname else "🎉 Tabriklaymiz! ")
-                + "Siz rasmiy Vertera hamkori sifatida tasdiqlandi!\n\n"
-                "Dream Team jamoasiga xush kelibsiz 🤝\n\n"
-                "Endi sizga mavjud:\n"
-                "📚 Yangilar uchun o'qitish (7 kun)\n"
-                "📊 Marketing rejasi\n\n"
-                "«📚 Yangilar uchun o'qitish» bo'limidan boshlang 👇"
-            ),
-        }
         await context.bot.send_message(
-            chat_id=uid,
-            text=approved_text.get(lang, approved_text["ru"]),
-            parse_mode="Markdown",
+            chat_id=uid, text=p["approved"],
             reply_markup=get_partner_kb(lang)
         )
         # Запускаем серию напоминаний
@@ -3530,8 +3555,7 @@ ADMIN_KB = ReplyKeyboardMarkup(
     [["👥 Список партнёров",  "📋 Заявки на вебинар"],
      ["📰 Добавить новость",  "🎬 Управление видео"],
      ["🎥 Отправить кружок",  "📢 Пост всем пользователям"],
-     ["📣 Рассылка партнёрам","🌍 Тест: язык/страна"],
-     ["🔙 Выход из админ-меню"]],
+     ["📣 Рассылка партнёрам","🔙 Выход из админ-меню"]],
     resize_keyboard=True
 )
 
@@ -3591,41 +3615,6 @@ async def admin_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return CHAT
     text = update.message.text
 
-    if text == "🌍 Тест: язык/страна":
-        context.user_data["admin_switch"] = True
-        cur_lang    = context.user_data.get("lang", "ru")
-        cur_country = context.user_data.get("country", "TKM")
-        kb = ReplyKeyboardMarkup([
-            ["🇷🇺 РУ + Туркменистан", "🇹🇲 ТМ + Туркменистан"],
-            ["🇷🇺 РУ + Узбекистан",   "🇺🇿 УЗ + Узбекистан"],
-            ["🔙 Отмена"]
-        ], resize_keyboard=True)
-        await update.message.reply_text(
-            "🌍 *Смена языка и страны*\n\n"
-            "Текущий режим: язык *" + cur_lang + "*, страна *" + cur_country + "*\n\n"
-            "Выберите режим для тестирования:",
-            parse_mode="Markdown", reply_markup=kb
-        )
-        return ADMIN_MENU
-
-    if context.user_data.get("admin_switch"):
-        sw = {"🇷🇺 РУ + Туркменистан": ("ru","TKM"), "🇹🇲 ТМ + Туркменистан": ("tk","TKM"),
-              "🇷🇺 РУ + Узбекистан": ("ru","UZB"),   "🇺🇿 УЗ + Узбекистан": ("uz","UZB")}
-        if text in sw:
-            nl, nc = sw[text]
-            context.user_data["lang"] = nl
-            context.user_data["country"] = nc
-            context.user_data.pop("admin_switch", None)
-            await update.message.reply_text(
-                "✅ Переключено: язык *" + nl + "*, страна *" + nc + "*",
-                parse_mode="Markdown", reply_markup=ADMIN_KB
-            )
-            return ADMIN_MENU
-        if text == "🔙 Отмена":
-            context.user_data.pop("admin_switch", None)
-            await update.message.reply_text("Отменено.", reply_markup=ADMIN_KB)
-            return ADMIN_MENU
-
     if text == "🔙 Выход из админ-меню":
         await update.message.reply_text(
             "Вышли из меню администратора.",
@@ -3641,22 +3630,13 @@ async def admin_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return ADMIN_MENU
         lines = []
         for uid, info in partners.items():
-            name = info.get("name", "—")
-            cid  = info.get("cid", "—")
-            lang_p = info.get("lang", "—")
-            country_p = info.get("country", "")
-            # Ссылка на чат с партнёром через tg://user?id=UID
-            tg_link = f"tg://user?id={uid}"
-            lines.append(
-                f"• [{name}]({tg_link})"
-                + (f" | {country_p}" if country_p else "")
-                + f" | {lang_p} | ID: `{cid}` | [→ Написать](tg://user?id={uid})"
-            )
+            lines.append(f"• {info.get('name','—')} | ID: {info.get('cid','—')} | {info.get('lang','—')} | tg: {uid}")
         msg = f"👥 *Партнёры ({len(lines)}):*\n\n" + "\n".join(lines)
+        # Разбиваем если длинный
         if len(msg) > 3500:
-            chunks = [lines[i:i+15] for i in range(0, len(lines), 15)]
+            chunks = [lines[i:i+20] for i in range(0, len(lines), 20)]
             for chunk in chunks:
-                await update.message.reply_text("\n".join(chunk), parse_mode="Markdown", reply_markup=ADMIN_KB)
+                await update.message.reply_text("\n".join(chunk), reply_markup=ADMIN_KB)
         else:
             await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=ADMIN_KB)
         return ADMIN_MENU
@@ -4319,6 +4299,7 @@ def main():
             PARTNER_CONTACTS_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, partner_contacts_name)],
             PARTNER_CONTACTS_PHONE:[MessageHandler(filters.TEXT & ~filters.COMMAND, partner_contacts_phone)],
             ANKETA_NAME:           [MessageHandler(filters.TEXT & ~filters.COMMAND, anketa_name)],
+            ANKETA_BIRTHDAY:       [MessageHandler(filters.TEXT & ~filters.COMMAND, anketa_birthday)],
             ANKETA_PHONE:          [MessageHandler(filters.TEXT & ~filters.COMMAND, anketa_phone)],
             ANKETA_CITY:           [MessageHandler(filters.TEXT & ~filters.COMMAND, anketa_city)],
             ANKETA_INTEREST:       [MessageHandler(filters.TEXT & ~filters.COMMAND, anketa_interest)],
