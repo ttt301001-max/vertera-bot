@@ -9,7 +9,7 @@ from telegram.ext import (
 from openai import OpenAI
 
 # ─── Настройки ───────────────────────────────────────────────
-BOT_TOKEN = os.getenv("BOT_TOKEN", "7146960065:AAEncOXgBeMjvUFGoX0f1QGr1_bHIDdK3gQ")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "7146960065:AAG3cTIvH7t4oJjeL8mTCK2MWIqlWfcz7bY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 GOOGLE_SHEET_URL = os.getenv("GOOGLE_SHEET_URL", "https://script.google.com/macros/s/AKfycbzqwkgp8nSXxtSN1VB16QObhcOgqY4ye45-_Xmpc9OgAQnhQLAdL3EcjcSSg8zz05c/exec")
 
