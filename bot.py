@@ -1,7 +1,7 @@
 import os
 import logging
 import httpx
-from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
     filters, ContextTypes, ConversationHandler
@@ -9,12 +9,15 @@ from telegram.ext import (
 from openai import OpenAI
 
 # ─── Настройки ───────────────────────────────────────────────
-BOT_TOKEN = os.getenv("BOT_TOKEN", "7146960065:AAG3cTIvH7t4oJjeL8mTCK2MWIqlWfcz7bY")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "")
+if not BOT_TOKEN:
+    raise RuntimeError("BOT_TOKEN не задан! Установите переменную окружения BOT_TOKEN.")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 GOOGLE_SHEET_URL = os.getenv("GOOGLE_SHEET_URL", "https://script.google.com/macros/s/AKfycbzqwkgp8nSXxtSN1VB16QObhcOgqY4ye45-_Xmpc9OgAQnhQLAdL3EcjcSSg8zz05c/exec")
 
 SPONSOR_USERNAME = "@tach_ttt"
-MANAGER_CHAT_ID = 699255285  # @tach_ttt
+MANAGER_CHAT_ID = int(os.getenv("MANAGER_CHAT_ID", "699255285"))
+BOT_USERNAME = os.getenv("BOT_USERNAME", "Verteratkmbot")  # @tach_ttt
 SPONSOR_PHONE_TKM = "+99363327177"
 SPONSOR_PHONE_UZB = "+99363327177"
 CATALOG_LINK = "https://t.me/Verteratkmbot/vertera_tkm"
@@ -42,9 +45,9 @@ _PROG_DATES_F = pathlib.Path("/tmp/vrt_prog_dates.json")
 _MKTPROG_F   = pathlib.Path("/tmp/vrt_mkt_progress.json")
 _QUIZ_F      = pathlib.Path("/tmp/vrt_quiz.json")
 _VIDEOS_F    = pathlib.Path("/tmp/vrt_videos.json")
-_MKTPROG_F   = pathlib.Path("/tmp/vrt_mkt_progress.json")
-_QUIZ_F      = pathlib.Path("/tmp/vrt_quiz.json")
 _USERS_F     = pathlib.Path("/tmp/vrt_users.json")
+_REFERRALS_F = pathlib.Path("/tmp/vrt_referrals.json")
+_WISHES_F    = pathlib.Path("/tmp/vrt_wishes.json")
 
 def _jload(p):
     try:
@@ -57,6 +60,30 @@ def _jsave(p, d):
         p.write_text(json.dumps(d, ensure_ascii=False))
     except Exception as e:
         logger.error(f"jsave {p}: {e}")
+
+
+def ref_add(inviter_uid: int, new_uid: int, new_name: str, new_uname: str):
+    d = _jload(_REFERRALS_F)
+    key = str(inviter_uid)
+    lst = d.get(key, [])
+    if not any(str(r.get("uid")) == str(new_uid) for r in lst):
+        lst.append({"uid": str(new_uid), "name": new_name, "uname": new_uname})
+        d[key] = lst
+        _jsave(_REFERRALS_F, d)
+
+def ref_get(inviter_uid: int) -> list:
+    return _jload(_REFERRALS_F).get(str(inviter_uid), [])
+
+def ref_count(inviter_uid: int) -> int:
+    return len(ref_get(inviter_uid))
+
+def wishes_add(uid: int, name: str, uname: str, text: str):
+    import time as _t
+    d = _jload(_WISHES_F)
+    lst = d.get("wishes", [])
+    lst.append({"uid": str(uid), "name": name, "uname": uname, "text": text, "ts": int(_t.time())})
+    d["wishes"] = lst
+    _jsave(_WISHES_F, d)
 
 def is_partner(uid):        return str(uid) in _jload(_PARTNERS_F)
 def partner_add(uid, name, cid, lang):
@@ -2972,6 +2999,7 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         day = mkt_progress_get(user.id)
         uname = f"@{user.username}" if user.username else str(user.id)
         if day == 0:
+            mkt_date_set(user.id, 1)
             mkt_progress_set(user.id, 1)
             await mkt_progress_sync(user.id, 1, user.full_name or "", uname)
             day = 1
@@ -2979,6 +3007,22 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             kb = ReplyKeyboardMarkup([[p.get("btn_review_mkt","📖 Просмотреть маркетинг")],[p["btn_back"]]],resize_keyboard=True)
             await update.message.reply_text(MKT_ALL_DONE.get(lang,MKT_ALL_DONE["ru"]),reply_markup=kb)
             return PARTNER_MENU
+        # Проверка блокировки по дате
+        if day > 1 and not mkt_can_open(user.id, day):
+            prev = mkt_date_get(user.id, day - 1)
+            if prev:
+                unlock = (_dt_mod.date.fromisoformat(prev) + _dt_mod.timedelta(days=1)).strftime("%d.%m.%Y")
+            else:
+                unlock = "завтра"
+            locked_m = {
+                "ru": f"🔒 *День {day} маркетинга пока недоступен*\n\n📅 Откроется: *{unlock}*\n\nПриходите завтра! 🌿",
+                "tk": f"🔒 *Marketing {day}-nji güni entek elýeterli däl*\n\n📅 Açylyş: *{unlock}*",
+                "uz": f"🔒 *Marketing {day}-kun hozircha mavjud emas*\n\n📅 Ochilish: *{unlock}*",
+            }
+            await update.message.reply_text(locked_m.get(lang, locked_m["ru"]), parse_mode="Markdown", reply_markup=get_partner_kb(lang))
+            return PARTNER_MENU
+        if not mkt_date_get(user.id, day):
+            mkt_date_set(user.id, day)
         mkt_kb = ReplyKeyboardMarkup([[MKT_DONE_BTN.get(lang,MKT_DONE_BTN["ru"])],[MKT_REPEAT_BTN.get(lang,MKT_REPEAT_BTN["ru"])],[p["btn_back"]]],resize_keyboard=True)
         await send_slot_video(context.bot, user.id, f"mkt_day_{day}", lang)
         await update.message.reply_text(MKT_DAYS[day].get(lang,MKT_DAYS[day]["ru"]),parse_mode="Markdown",reply_markup=mkt_kb)
@@ -2988,6 +3032,7 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     if text in list(MKT_DONE_BTN.values()):
         day = mkt_progress_get(user.id)
         uname = f"@{user.username}" if user.username else str(user.id)
+        mkt_date_set(user.id, day)   # фиксируем дату — следующий день откроется завтра
         new_day = day + 1
         mkt_progress_set(user.id, new_day)
         await mkt_progress_sync(user.id, new_day, user.full_name or "", uname)
@@ -3555,7 +3600,8 @@ ADMIN_KB = ReplyKeyboardMarkup(
     [["👥 Список партнёров",  "📋 Заявки на вебинар"],
      ["📰 Добавить новость",  "🎬 Управление видео"],
      ["🎥 Отправить кружок",  "📢 Пост всем пользователям"],
-     ["📣 Рассылка партнёрам","🔙 Выход из админ-меню"]],
+     ["📣 Рассылка партнёрам","🌍 Тест: язык/страна"],
+     ["🔙 Выход из админ-меню"]],
     resize_keyboard=True
 )
 
@@ -3614,6 +3660,40 @@ async def admin_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return CHAT
     text = update.message.text
+
+    # ── Тест: смена языка/страны ─────────────────────────────
+    if text == "🌍 Тест: язык/страна":
+        context.user_data["admin_switch"] = True
+        cur_lang    = context.user_data.get("lang", "ru")
+        cur_country = context.user_data.get("country", "TKM")
+        kb = ReplyKeyboardMarkup([
+            ["🇷🇺 РУ + Туркменистан", "🇹🇲 ТМ + Туркменистан"],
+            ["🇷🇺 РУ + Узбекистан",   "🇺🇿 УЗ + Узбекистан"],
+            ["🔙 Отмена"]
+        ], resize_keyboard=True)
+        msg_sw = "🌍 *Смена языка и страны*\n\nТекущий режим: язык *" + cur_lang + "*, страна *" + cur_country + "*\n\nВыберите режим:"
+        await update.message.reply_text(msg_sw, parse_mode="Markdown", reply_markup=kb)
+        return ADMIN_MENU
+
+    if context.user_data.get("admin_switch"):
+        sw = {
+            "🇷🇺 РУ + Туркменистан": ("ru", "TKM"),
+            "🇹🇲 ТМ + Туркменистан": ("tk", "TKM"),
+            "🇷🇺 РУ + Узбекистан":   ("ru", "UZB"),
+            "🇺🇿 УЗ + Узбекистан":   ("uz", "UZB"),
+        }
+        if text in sw:
+            nl, nc = sw[text]
+            context.user_data["lang"]    = nl
+            context.user_data["country"] = nc
+            context.user_data.pop("admin_switch", None)
+            msg_switched = "✅ Переключено: язык *" + nl + "*, страна *" + nc + "*\n\nТеперь все функции бота работают в этом режиме."
+            await update.message.reply_text(msg_switched, parse_mode="Markdown", reply_markup=ADMIN_KB)
+            return ADMIN_MENU
+        if text == "🔙 Отмена":
+            context.user_data.pop("admin_switch", None)
+            await update.message.reply_text("Отменено.", reply_markup=ADMIN_KB)
+            return ADMIN_MENU
 
     if text == "🔙 Выход из админ-меню":
         await update.message.reply_text(
