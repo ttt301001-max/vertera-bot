@@ -25,6 +25,11 @@ REGISTER_LINK = "https://id.boss.vertera.org/register?ref=FEKMPTVL85&service=OS3
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 logging.basicConfig(level=logging.INFO)
+
+# Не записываем адреса HTTP-запросов с токеном Telegram.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
 
 # ─── Состояния ───────────────────────────────────────────────
