@@ -13,6 +13,9 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 if not BOT_TOKEN:
     raise RuntimeError("BOT_TOKEN не задан! Установите переменную окружения BOT_TOKEN.")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+BOT_API_SECRET = os.getenv("BOT_API_SECRET", "")
+if not BOT_API_SECRET:
+    raise RuntimeError("BOT_API_SECRET не задан в Railway")
 GOOGLE_SHEET_URL = os.getenv("GOOGLE_SHEET_URL", "https://script.google.com/macros/s/AKfycbzqwkgp8nSXxtSN1VB16QObhcOgqY4ye45-_Xmpc9OgAQnhQLAdL3EcjcSSg8zz05c/exec")
 
 SPONSOR_USERNAME = "@tach_ttt"
@@ -98,7 +101,7 @@ async def partner_add_sheets(uid, name, cid, lang, uname, bot_instance=None):
     """Сохраняет партнёра в Google Sheets для постоянного хранения."""
     try:
         async with httpx.AsyncClient() as c:
-            await c.post(GOOGLE_SHEET_URL, json={
+            await c.post(GOOGLE_SHEET_URL, json={"api_secret": BOT_API_SECRET,
                 "type": "partner",
                 "user_id": str(uid),
                 "name": name,
@@ -130,7 +133,7 @@ async def user_register_sheets(uid: int, lang: str, country: str, name: str, una
     """Сохраняет нового пользователя в Google Sheets."""
     try:
         async with httpx.AsyncClient(follow_redirects=True) as c:
-            await c.post(GOOGLE_SHEET_URL, json={
+            await c.post(GOOGLE_SHEET_URL, json={"api_secret": BOT_API_SECRET,
                 "type":    "user",
                 "user_id": str(uid),
                 "lang":    lang,
@@ -146,7 +149,7 @@ async def users_load_from_sheets():
     try:
         async with httpx.AsyncClient(follow_redirects=True) as c:
             resp = await c.post(GOOGLE_SHEET_URL,
-                                json={"type": "get_users"}, timeout=15)
+                                json={"api_secret": BOT_API_SECRET,"type": "get_users"}, timeout=15)
             data = resp.json()
             if data.get("status") == "ok" and data.get("users"):
                 d = _jload(_USERS_F)
@@ -226,14 +229,14 @@ def mkt_progress_set(uid, day):
 async def mkt_progress_sync(uid, day, name, uname):
     try:
         async with httpx.AsyncClient(follow_redirects=True) as c:
-            await c.post(GOOGLE_SHEET_URL, json={"type":"mkt_progress","user_id":str(uid),"name":name,"username":uname,"day":day}, timeout=10)
+            await c.post(GOOGLE_SHEET_URL, json={"api_secret": BOT_API_SECRET,"type":"mkt_progress","user_id":str(uid),"name":name,"username":uname,"day":day}, timeout=10)
     except Exception as e:
         logger.error(f"mkt_sync: {e}")
 
 async def mkt_progress_load():
     try:
         async with httpx.AsyncClient(follow_redirects=True) as c:
-            resp = await c.post(GOOGLE_SHEET_URL, json={"type":"get_mkt_progress"}, timeout=15)
+            resp = await c.post(GOOGLE_SHEET_URL, json={"api_secret": BOT_API_SECRET,"type":"get_mkt_progress"}, timeout=15)
             data = resp.json()
             if data.get("status") == "ok":
                 d = _jload(_MKTPROG_F)
@@ -256,14 +259,14 @@ def quiz_set(uid, qname, score, total):
 async def quiz_sync(uid, qname, score, total, name, uname):
     try:
         async with httpx.AsyncClient(follow_redirects=True) as c:
-            await c.post(GOOGLE_SHEET_URL, json={"type":"quiz_result","user_id":str(uid),"name":name,"username":uname,"quiz":qname,"score":score,"total":total}, timeout=10)
+            await c.post(GOOGLE_SHEET_URL, json={"api_secret": BOT_API_SECRET,"type":"quiz_result","user_id":str(uid),"name":name,"username":uname,"quiz":qname,"score":score,"total":total}, timeout=10)
     except Exception as e:
         logger.error(f"quiz_sync: {e}")
 
 async def quiz_load():
     try:
         async with httpx.AsyncClient(follow_redirects=True) as c:
-            resp = await c.post(GOOGLE_SHEET_URL, json={"type":"get_quiz"}, timeout=15)
+            resp = await c.post(GOOGLE_SHEET_URL, json={"api_secret": BOT_API_SECRET,"type":"get_quiz"}, timeout=15)
             data = resp.json()
             if data.get("status") == "ok":
                 d = _jload(_QUIZ_F)
@@ -531,7 +534,7 @@ async def videos_save_to_sheets():
         d = _jload(_VIDEOS_F)
         import json as _json
         async with httpx.AsyncClient(follow_redirects=True) as c:
-            await c.post(GOOGLE_SHEET_URL, json={
+            await c.post(GOOGLE_SHEET_URL, json={"api_secret": BOT_API_SECRET,
                 "type":   "save_videos",
                 "videos": _json.dumps(d, ensure_ascii=False),
             }, timeout=30)
@@ -544,7 +547,7 @@ async def videos_load_from_sheets():
     try:
         import json as _json
         async with httpx.AsyncClient(follow_redirects=True) as c:
-            resp = await c.post(GOOGLE_SHEET_URL, json={"type": "get_videos"}, timeout=15)
+            resp = await c.post(GOOGLE_SHEET_URL, json={"api_secret": BOT_API_SECRET,"type": "get_videos"}, timeout=15)
             data = resp.json()
         if data.get("status") == "ok" and data.get("videos"):
             d = _json.loads(data["videos"])
@@ -559,7 +562,7 @@ async def progress_sync_to_sheets(uid: int, day: int, name: str, uname: str):
     """Сохраняет прогресс в Google Sheets."""
     try:
         async with httpx.AsyncClient(follow_redirects=True) as c:
-            await c.post(GOOGLE_SHEET_URL, json={
+            await c.post(GOOGLE_SHEET_URL, json={"api_secret": BOT_API_SECRET,
                 "type":     "progress",
                 "user_id":  str(uid),
                 "name":     name,
@@ -574,7 +577,7 @@ async def progress_load_from_sheets():
     try:
         async with httpx.AsyncClient(follow_redirects=True) as c:
             resp = await c.post(GOOGLE_SHEET_URL,
-                                json={"type": "get_progress"}, timeout=15)
+                                json={"api_secret": BOT_API_SECRET,"type": "get_progress"}, timeout=15)
             data = resp.json()
             if data.get("status") == "ok" and data.get("progress"):
                 d = _jload(_PROGRESS_F)
@@ -1229,7 +1232,7 @@ async def _load_partners_impl(app=None):
         async with httpx.AsyncClient(follow_redirects=True) as c:
             resp = await c.post(
                 GOOGLE_SHEET_URL,
-                json={"type": "get_partners"},
+                json={"api_secret": BOT_API_SECRET,"type": "get_partners"},
                 timeout=15
             )
             data = resp.json()
@@ -1712,7 +1715,7 @@ async def anketa_interest(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         async with httpx.AsyncClient() as http_client:
-            await http_client.post(GOOGLE_SHEET_URL, json={
+            await http_client.post(GOOGLE_SHEET_URL, json={"api_secret": BOT_API_SECRET,
                 "type":     "anketa",
                 "country":  country,
                 "lang":     lang,
@@ -2809,7 +2812,7 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             # Сохраняем в Sheets
             try:
                 async with httpx.AsyncClient(follow_redirects=True) as _hc:
-                    await _hc.post(GOOGLE_SHEET_URL, json={
+                    await _hc.post(GOOGLE_SHEET_URL, json={"api_secret": BOT_API_SECRET,
                         "type": "update_birthday",
                         "user_id": uid_str,
                         "birthday": text.strip(),
@@ -2845,7 +2848,7 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             try:
                 async with httpx.AsyncClient(follow_redirects=True) as c:
                     resp = await c.post(GOOGLE_SHEET_URL,
-                                        json={"type": "get_progress", "user_id": str(user.id)}, timeout=10)
+                                        json={"api_secret": BOT_API_SECRET,"type": "get_progress", "user_id": str(user.id)}, timeout=10)
                     rdata = resp.json()
                     if rdata.get("status") == "ok" and rdata.get("progress"):
                         for row in rdata["progress"]:
@@ -2906,7 +2909,7 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             # Сохраняем запись
             try:
                 async with httpx.AsyncClient(follow_redirects=True) as _hc:
-                    await _hc.post(GOOGLE_SHEET_URL, json={
+                    await _hc.post(GOOGLE_SHEET_URL, json={"api_secret": BOT_API_SECRET,
                         "type": "diary", "user_id": str(user.id),
                         "name": user.full_name or uname_d, "username": uname_d,
                         "dtype": dtype, "day": dday, "text": text, "lang": lang,
@@ -3198,7 +3201,7 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         # Сохраняем в Google Sheets
         try:
             async with httpx.AsyncClient() as hc:
-                await hc.post(GOOGLE_SHEET_URL, json={
+                await hc.post(GOOGLE_SHEET_URL, json={"api_secret": BOT_API_SECRET,
                     "type":     "webinar",
                     "user_id":  str(user.id),
                     "name":     user.full_name or uname,
@@ -3345,7 +3348,7 @@ async def partner_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         uname_w = f"@{user.username}" if user.username else str(user.id)
         try:
             async with httpx.AsyncClient(follow_redirects=True) as _hc:
-                await _hc.post(GOOGLE_SHEET_URL, json={"type":"wish","user_id":str(user.id),"name":user.full_name or uname_w,"username":uname_w,"text":text,"lang":lang}, timeout=10)
+                await _hc.post(GOOGLE_SHEET_URL, json={"api_secret": BOT_API_SECRET,"type":"wish","user_id":str(user.id),"name":user.full_name or uname_w,"username":uname_w,"text":text,"lang":lang}, timeout=10)
         except Exception as e:
             logger.error(f"wish: {e}")
         try:
